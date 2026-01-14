@@ -20,12 +20,19 @@ export interface PivotedLeaderboardRowWithImprovement {
   latestEvalEndedAt?: string;
   modelId: string;
   baseModelName: string;
+  // Duplicate tracking fields
+  modelDuplicateOf: string | null;
+  canonicalModelName: string;
+  canonicalBaseModelName: string;
   benchmarks: Record<string, {
     accuracy: number;
     standardError: number;
     hfTracesLink?: string;
     baseModelAccuracy?: number;
     improvement?: number;
+    // Duplicate tracking for benchmarks
+    benchmarkDuplicateOf: string | null;
+    canonicalBenchmarkName: string;
   }>;
 }
 
@@ -41,6 +48,9 @@ interface LeaderboardTableWithImprovementProps {
     baseModels: string[];
     benchmarks: string[];
   };
+  // Duplicate display controls
+  showDuplicateBenchmarks: boolean;
+  showDuplicateModels: boolean;
 }
 
 type SortField = 'modelName' | 'agentName' | 'baseModelName' | 'firstEvalEndedAt' | 'latestEvalEndedAt' | string; // string for dynamic benchmark names
@@ -53,7 +63,9 @@ export default function LeaderboardTableWithImprovement({
   agentSearch,
   baseModelSearch,
   benchmarkSearch,
-  filters
+  filters,
+  showDuplicateBenchmarks,
+  showDuplicateModels
 }: LeaderboardTableWithImprovementProps) {
   const [sortField, setSortField] = useState<SortField>('modelName');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -83,18 +95,82 @@ export default function LeaderboardTableWithImprovement({
     };
   }, [data.length]);
 
-  // Get all unique benchmark names from the data
+  // Build a map of duplicate benchmark -> canonical benchmark from the data
+  const benchmarkDuplicateMap = useMemo(() => {
+    const map = new Map<string, string>(); // duplicateName -> canonicalName
+    data.forEach(row => {
+      Object.entries(row.benchmarks).forEach(([benchmarkName, benchmarkData]) => {
+        if (benchmarkData.benchmarkDuplicateOf && benchmarkData.canonicalBenchmarkName) {
+          map.set(benchmarkName, benchmarkData.canonicalBenchmarkName);
+        }
+      });
+    });
+    return map;
+  }, [data]);
+
+  // Process data to handle duplicate models
+  const processedData = useMemo(() => {
+    let processed = data;
+
+    // If not showing duplicate models, filter them out and substitute base model names
+    if (!showDuplicateModels) {
+      processed = processed
+        .filter(row => row.modelDuplicateOf === null)
+        .map(row => ({
+          ...row,
+          // Substitute base model name with canonical name
+          baseModelName: row.canonicalBaseModelName
+        }));
+    }
+
+    // If not showing duplicate benchmarks, merge duplicate benchmark results into canonical columns
+    if (!showDuplicateBenchmarks) {
+      processed = processed.map(row => {
+        const newBenchmarks = { ...row.benchmarks };
+
+        // For each duplicate benchmark, check if we should merge into canonical
+        benchmarkDuplicateMap.forEach((canonicalName, duplicateName) => {
+          const duplicateData = newBenchmarks[duplicateName];
+          const canonicalData = newBenchmarks[canonicalName];
+
+          // If we have duplicate data but no canonical data, copy it over
+          if (duplicateData && !canonicalData) {
+            newBenchmarks[canonicalName] = {
+              ...duplicateData,
+              // Update the canonical name reference
+              canonicalBenchmarkName: canonicalName,
+              benchmarkDuplicateOf: null
+            };
+          }
+        });
+
+        return {
+          ...row,
+          benchmarks: newBenchmarks
+        };
+      });
+    }
+
+    return processed;
+  }, [data, showDuplicateModels, showDuplicateBenchmarks, benchmarkDuplicateMap]);
+
+  // Get all unique benchmark names from the processed data
   const allBenchmarks = useMemo(() => {
     const benchmarkSet = new Set<string>();
-    data.forEach(row => {
+    processedData.forEach(row => {
       Object.keys(row.benchmarks).forEach(benchmark => benchmarkSet.add(benchmark));
     });
     return Array.from(benchmarkSet).sort();
-  }, [data]);
+  }, [processedData]);
 
-  // Filter which benchmark columns to show based on search and filters
+  // Filter which benchmark columns to show based on search, filters, and duplicate settings
   const visibleBenchmarks = useMemo(() => {
     let visible = allBenchmarks;
+
+    // If not showing duplicate benchmarks, filter them out (show only canonical benchmarks)
+    if (!showDuplicateBenchmarks) {
+      visible = visible.filter(benchmark => !benchmarkDuplicateMap.has(benchmark));
+    }
 
     // Filter by benchmark search
     if (benchmarkSearch) {
@@ -108,11 +184,11 @@ export default function LeaderboardTableWithImprovement({
     }
 
     return visible;
-  }, [allBenchmarks, benchmarkSearch, filters.benchmarks]);
+  }, [allBenchmarks, benchmarkSearch, filters.benchmarks, showDuplicateBenchmarks, benchmarkDuplicateMap]);
 
-  // Filter and sort the data
+  // Filter and sort the processed data (after duplicate handling)
   const filteredAndSortedData = useMemo(() => {
-    let filtered = data;
+    let filtered = processedData;
 
     // Filter by model search
     if (modelSearch) {
@@ -206,7 +282,7 @@ export default function LeaderboardTableWithImprovement({
     }
 
     return filtered;
-  }, [data, modelSearch, agentSearch, baseModelSearch, filters, sortField, sortDirection, sortModePerBenchmark]);
+  }, [processedData, modelSearch, agentSearch, baseModelSearch, filters, sortField, sortDirection, sortModePerBenchmark]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {

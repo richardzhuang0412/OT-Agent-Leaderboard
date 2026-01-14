@@ -16,6 +16,13 @@ export interface BenchmarkResultWithImprovement extends BenchmarkResultExtended 
   agentId: string;
   benchmarkId: string;
   endedAt?: string;
+  // Duplicate tracking fields
+  modelDuplicateOf: string | null;
+  canonicalModelName: string;
+  baseModelDuplicateOf: string | null;
+  canonicalBaseModelName: string;
+  benchmarkDuplicateOf: string | null;
+  canonicalBenchmarkName: string;
 }
 
 export interface IStorage {
@@ -87,6 +94,13 @@ export class DbStorage implements IStorage {
       baseModelAccuracy: row.base_model_accuracy ?? undefined,
       agentId: row.agent_id,
       benchmarkId: row.benchmark_id,
+      // Duplicate tracking fields
+      modelDuplicateOf: row.model_duplicate_of ?? null,
+      canonicalModelName: row.canonical_model_name ?? row.model_name,
+      baseModelDuplicateOf: row.base_model_duplicate_of ?? null,
+      canonicalBaseModelName: row.canonical_base_model_name ?? row.base_model_name,
+      benchmarkDuplicateOf: row.benchmark_duplicate_of ?? null,
+      canonicalBenchmarkName: row.canonical_benchmark_name ?? row.benchmark_name,
     }));
   }
 

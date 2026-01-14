@@ -3,6 +3,7 @@ import { RefreshCw, Info, ExternalLink, AlertCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import LeaderboardTableWithImprovement, { type PivotedLeaderboardRowWithImprovement } from '@/components/LeaderboardTableWithImprovement';
 import SearchBarWithBaseModel from '@/components/SearchBarWithBaseModel';
@@ -23,6 +24,9 @@ export default function Leaderboard() {
   const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
   const [selectedBaseModels, setSelectedBaseModels] = useState<string[]>([]);
   const [selectedBenchmarks, setSelectedBenchmarks] = useState<string[]>([]);
+  // Duplicate display controls (default: hide duplicates)
+  const [showDuplicateBenchmarks, setShowDuplicateBenchmarks] = useState(false);
+  const [showDuplicateModels, setShowDuplicateModels] = useState(false);
 
   // Always fetch improvement metrics data
   const { data: pivotedData = [], isLoading, refetch } = useQuery<PivotedLeaderboardRowWithImprovement[]>({
@@ -193,21 +197,53 @@ export default function Leaderboard() {
           />
 
           {/* Filters */}
-          <FilterControlsWithBaseModel
-            availableModels={availableModels}
-            availableAgents={availableAgents}
-            availableBaseModels={availableBaseModels}
-            availableBenchmarks={availableBenchmarks}
-            selectedModels={selectedModels}
-            selectedAgents={selectedAgents}
-            selectedBaseModels={selectedBaseModels}
-            selectedBenchmarks={selectedBenchmarks}
-            onModelsChange={setSelectedModels}
-            onAgentsChange={setSelectedAgents}
-            onBaseModelsChange={setSelectedBaseModels}
-            onBenchmarksChange={setSelectedBenchmarks}
-            onClearAll={handleClearFilters}
-          />
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <FilterControlsWithBaseModel
+              availableModels={availableModels}
+              availableAgents={availableAgents}
+              availableBaseModels={availableBaseModels}
+              availableBenchmarks={availableBenchmarks}
+              selectedModels={selectedModels}
+              selectedAgents={selectedAgents}
+              selectedBaseModels={selectedBaseModels}
+              selectedBenchmarks={selectedBenchmarks}
+              onModelsChange={setSelectedModels}
+              onAgentsChange={setSelectedAgents}
+              onBaseModelsChange={setSelectedBaseModels}
+              onBenchmarksChange={setSelectedBenchmarks}
+              onClearAll={handleClearFilters}
+            />
+
+            {/* Duplicate Display Controls */}
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="show-duplicate-benchmarks"
+                  checked={showDuplicateBenchmarks}
+                  onCheckedChange={(checked) => setShowDuplicateBenchmarks(checked === true)}
+                />
+                <label
+                  htmlFor="show-duplicate-benchmarks"
+                  className="text-sm text-muted-foreground cursor-pointer select-none"
+                >
+                  Show duplicate benchmarks
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="show-duplicate-models"
+                  checked={showDuplicateModels}
+                  onCheckedChange={(checked) => setShowDuplicateModels(checked === true)}
+                />
+                <label
+                  htmlFor="show-duplicate-models"
+                  className="text-sm text-muted-foreground cursor-pointer select-none"
+                >
+                  Show duplicate models
+                </label>
+              </div>
+            </div>
+          </div>
 
           <div className="space-y-4 px-3 py-3 bg-muted/30 rounded-md text-sm text-muted-foreground">
             {/* Row Highlighting */}
@@ -305,6 +341,8 @@ export default function Leaderboard() {
                 baseModels: selectedBaseModels,
                 benchmarks: selectedBenchmarks,
               }}
+              showDuplicateBenchmarks={showDuplicateBenchmarks}
+              showDuplicateModels={showDuplicateModels}
             />
           </TabsContent>
 
@@ -321,21 +359,53 @@ export default function Leaderboard() {
             />
 
             {/* Filters */}
-            <FilterControlsWithBaseModel
-              availableModels={availableModels}
-              availableAgents={availableAgents}
-              availableBaseModels={availableBaseModels}
-              availableBenchmarks={availableBenchmarks}
-              selectedModels={selectedModels}
-              selectedAgents={selectedAgents}
-              selectedBaseModels={selectedBaseModels}
-              selectedBenchmarks={selectedBenchmarks}
-              onModelsChange={setSelectedModels}
-              onAgentsChange={setSelectedAgents}
-              onBaseModelsChange={setSelectedBaseModels}
-              onBenchmarksChange={setSelectedBenchmarks}
-              onClearAll={handleClearFilters}
-            />
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <FilterControlsWithBaseModel
+                availableModels={availableModels}
+                availableAgents={availableAgents}
+                availableBaseModels={availableBaseModels}
+                availableBenchmarks={availableBenchmarks}
+                selectedModels={selectedModels}
+                selectedAgents={selectedAgents}
+                selectedBaseModels={selectedBaseModels}
+                selectedBenchmarks={selectedBenchmarks}
+                onModelsChange={setSelectedModels}
+                onAgentsChange={setSelectedAgents}
+                onBaseModelsChange={setSelectedBaseModels}
+                onBenchmarksChange={setSelectedBenchmarks}
+                onClearAll={handleClearFilters}
+              />
+
+              {/* Duplicate Display Controls */}
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="show-duplicate-benchmarks-all"
+                    checked={showDuplicateBenchmarks}
+                    onCheckedChange={(checked) => setShowDuplicateBenchmarks(checked === true)}
+                  />
+                  <label
+                    htmlFor="show-duplicate-benchmarks-all"
+                    className="text-sm text-muted-foreground cursor-pointer select-none"
+                  >
+                    Show duplicate benchmarks
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="show-duplicate-models-all"
+                    checked={showDuplicateModels}
+                    onCheckedChange={(checked) => setShowDuplicateModels(checked === true)}
+                  />
+                  <label
+                    htmlFor="show-duplicate-models-all"
+                    className="text-sm text-muted-foreground cursor-pointer select-none"
+                  >
+                    Show duplicate models
+                  </label>
+                </div>
+              </div>
+            </div>
 
             <div className="space-y-4 px-3 py-3 bg-muted/30 rounded-md text-sm text-muted-foreground">
               {/* Row Highlighting */}
@@ -432,6 +502,8 @@ export default function Leaderboard() {
                 baseModels: selectedBaseModels,
                 benchmarks: selectedBenchmarks,
               }}
+              showDuplicateBenchmarks={showDuplicateBenchmarks}
+              showDuplicateModels={showDuplicateModels}
             />
           </TabsContent>
         </Tabs>

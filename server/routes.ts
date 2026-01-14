@@ -126,12 +126,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         baseModelName: string;
         firstEvalEndedAt?: string;
         latestEvalEndedAt?: string;
+        // Duplicate tracking fields
+        modelDuplicateOf: string | null;
+        canonicalModelName: string;
+        canonicalBaseModelName: string;
         benchmarks: Record<string, {
           accuracy: number;
           standardError: number;
           hfTracesLink?: string;
           baseModelAccuracy?: number;
           improvement?: number;
+          // Duplicate tracking for benchmarks
+          benchmarkDuplicateOf: string | null;
+          canonicalBenchmarkName: string;
         }>;
       }>();
 
@@ -146,6 +153,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             baseModelName: result.baseModelName,
             firstEvalEndedAt: result.endedAt,
             latestEvalEndedAt: result.endedAt,
+            // Duplicate tracking fields
+            modelDuplicateOf: result.modelDuplicateOf,
+            canonicalModelName: result.canonicalModelName,
+            canonicalBaseModelName: result.canonicalBaseModelName,
             benchmarks: {}
           });
         }
@@ -169,7 +180,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           standardError: result.standardError,
           hfTracesLink: result.hfTracesLink,
           baseModelAccuracy: result.baseModelAccuracy,
-          improvement: improvement
+          improvement: improvement,
+          // Duplicate tracking for benchmarks
+          benchmarkDuplicateOf: result.benchmarkDuplicateOf,
+          canonicalBenchmarkName: result.canonicalBenchmarkName
         };
       }
 
