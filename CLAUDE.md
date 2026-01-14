@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 An LLM Agent Benchmark Leaderboard web application for displaying and comparing benchmark results across different models, agents, and benchmark types. Built as a full-stack TypeScript application with React frontend and Express backend, backed by Supabase PostgreSQL.
 
+**Two-Part System:**
+- **This repo (OT-Agent-Leaderboard)**: React/Express web frontend that reads and displays leaderboard data
+- **dcagents-leaderboard/unified_db**: Python package that writes evaluation data to the database
+
 ## Development Commands
 
 ### Core Commands
@@ -77,7 +81,34 @@ The application uses a Supabase database with the following key tables:
 - `sandbox_trials` - Individual trial results for each job
 - `sandbox_tasks` - Task definitions used in benchmarks
 
-The leaderboard reads from a `leaderboard_results` view that aggregates data from `sandbox_jobs`, keeping the earliest valid result per (model, agent, benchmark) combination.
+The leaderboard reads from a `leaderboard_results` view that aggregates data from `sandbox_jobs`, keeping the latest valid result per (model, agent, benchmark) combination.
+
+### Database Schema (unified_db)
+
+The full database schema is defined in `dcagents-leaderboard/unified_db/complete_schema.sql`. Key relationships:
+
+```
+agents (id, name, agent_version_hash)
+   ↓
+models (id, name, agent_id → agents.id, ...)
+   ↓
+sandbox_jobs (agent_id → agents.id, model_id → models.id, benchmark_id → benchmarks.id, metrics JSONB)
+   ↓
+leaderboard_results VIEW (aggregates sandbox_jobs by model/agent/benchmark, extracts accuracy metrics)
+```
+
+The `leaderboard_results` view extracts `accuracy` and `accuracy_stderr` from the `metrics` JSONB array in `sandbox_jobs`:
+```sql
+SELECT DISTINCT ON (a.name, m.name, b.name)
+  m.name as model_name, a.name as agent_name, b.name as benchmark_name,
+  (SELECT (elem->>'value')::float * 100 FROM jsonb_array_elements(sj.metrics) elem WHERE elem->>'name' = 'accuracy') as accuracy,
+  (SELECT (elem->>'value')::float * 100 FROM jsonb_array_elements(sj.metrics) elem WHERE elem->>'name' = 'accuracy_stderr') as standard_error
+FROM sandbox_jobs sj
+JOIN agents a ON sj.agent_id = a.id
+JOIN models m ON sj.model_id = m.id
+JOIN benchmarks b ON sj.benchmark_id = b.id
+ORDER BY a.name, m.name, b.name, COALESCE(sj.ended_at, sj.created_at) DESC;
+```
 
 ### API Endpoints
 
@@ -203,12 +234,48 @@ All filtering happens after the data is loaded, so it's instant. To understand t
 
 ### Adding or Updating Benchmark Data
 
-Data comes from the Supabase `leaderboard_results` view, which aggregates from `sandbox_jobs`:
+Data comes from the Supabase `leaderboard_results` view, which aggregates from `sandbox_jobs`.
 
-1. Insert records into Supabase tables: `agents`, `models`, `benchmarks`, `sandbox_jobs`, `sandbox_trials`
-2. The `leaderboard_results` view automatically includes the earliest valid results per (model, agent, benchmark) combination
-3. **Important**: The view deduplicates using `DISTINCT ON (a.name, m.name, b.name)` and orders by timestamp ascending, so only the earliest valid job result for each combination appears
-4. Click the Refresh button on the leaderboard to reload data from the API
+**Using the Python unified_db Package** (preferred method):
+
+The `dcagents-leaderboard/unified_db` package provides Python functions to insert evaluation data:
+
+```bash
+cd dcagents-leaderboard
+pip install -r requirements.txt
+```
+
+```python
+from unified_db import (
+    register_agent, register_benchmark, register_hf_model,
+    register_sandbox_job, upload_eval_results
+)
+
+# Register prerequisites
+agent = register_agent(name="MyAgent", agent_version_hash="abc123...")
+benchmark = register_benchmark(name="GAIA", description="GAIA benchmark")
+model = register_hf_model(repo_name="openai/gpt-4", agent_id=agent['agent']['id'], ...)
+
+# Upload evaluation results
+result = register_sandbox_job(
+    job_name="Eval Run",
+    agent_id=agent['agent']['id'],
+    model_id=model['model']['id'],
+    benchmark_id=benchmark['benchmark']['id'],
+    metrics=[{"name": "accuracy", "value": 0.85}, {"name": "accuracy_stderr", "value": 0.02}],
+    ...
+)
+```
+
+Key unified_db functions:
+- `register_agent()`, `register_benchmark()`, `register_hf_model()` - Create base entities
+- `register_sandbox_job()` - Record evaluation runs with metrics
+- `upload_eval_results()` - High-level function for complete eval result upload
+- `upload_traces_to_hf()` - Upload traces to HuggingFace
+
+**View Behavior:**
+- The view deduplicates using `DISTINCT ON (a.name, m.name, b.name)` and orders by `ended_at DESC`, so only the **latest** job result for each combination appears
+- Click the Refresh button on the leaderboard to reload data from the API
 
 ### Modifying the Data Transformation (Pivoting)
 
@@ -328,6 +395,20 @@ Key files for common modifications:
 - **Filtering**: `client/src/components/FilterControls.tsx` and `SearchBar.tsx` - Filter UI
 - **API**: `server/routes.ts` - `/api/leaderboard-pivoted` endpoint (data transformation)
 - **Data Access**: `server/storage.ts` - Database query abstraction
-- **Database**: `create_leaderboard_view.sql` - Supabase view definition
+- **Database View**: `create_leaderboard_view.sql` - Supabase view definition
 - **Types**: `shared/schema.ts` - Shared TypeScript types and Zod schemas
-- Do not write unnecessary progress summary files, put all summary/progresses under PROGRESS.md
+
+**Database Backend (dcagents-leaderboard/unified_db/):**
+- `complete_schema.sql` - Full PostgreSQL schema with all tables
+- `__init__.py` - Exported Python API functions
+- `utils.py` - Core implementation of registration functions
+- `models.py` - Pydantic models for data validation
+- `config.py` - Supabase client configuration
+
+## Related Repository
+
+The `dcagents-leaderboard/unified_db` Python package manages all database writes. See its README for detailed API documentation including:
+- Dataset registration (HuggingFace and local parquet)
+- Model registration and training tracking
+- Agent and benchmark management
+- Sandbox evaluation job and trial recording

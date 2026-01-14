@@ -139,7 +139,7 @@ export default function Leaderboard() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 gap-4">
             <div className="flex items-center gap-4">
               <h1 className="text-2xl font-bold text-foreground" data-testid="text-page-title">
@@ -165,7 +165,7 @@ export default function Leaderboard() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="px-4 sm:px-6 lg:px-8 py-8">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'filtered' | 'all')}>
           <TabsList>
             <TabsTrigger value="filtered">Filtered View</TabsTrigger>
