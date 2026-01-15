@@ -1,6 +1,65 @@
 # Leaderboard Development Progress
 
-## Latest Update: January 13, 2026
+## Latest Update: January 15, 2026
+
+### New Feature: Configurable "Top N Performers by Benchmark" with Duplicate Support
+
+Improved the "Top N Performers" filter to allow users to select which benchmark to sort by, with full support for duplicate benchmark handling.
+
+**What Changed:**
+- Added a benchmark selector dropdown next to the N selector in the ViewModeControls
+- New UI: "Top [N dropdown] Performers by [Benchmark dropdown]"
+- Default benchmark remains `dev_set_71_tasks`
+- Users can now see top performers ranked by any available canonical benchmark
+
+**Duplicate-Aware Sorting:**
+- Dropdown only shows canonical benchmarks (duplicate benchmarks are excluded)
+- When sorting by a canonical benchmark, models without the canonical result but with a duplicate benchmark result will use the duplicate's accuracy for sorting
+- This ensures models are ranked correctly even when only duplicate benchmark results exist
+
+**Files Modified:**
+- `client/src/components/ViewModeControls.tsx` - Added benchmark selector dropdown and new props
+- `client/src/pages/Leaderboard.tsx`:
+  - Added `topPerformerBenchmark` state
+  - Added `benchmarkDuplicateMap` and `canonicalToDuplicatesMap` for duplicate tracking
+  - Added `canonicalBenchmarks` computed value to filter dropdown options
+  - Updated `filteredByViewMode` with `getAccuracyForSorting` helper for duplicate fallback
+
+---
+
+## January 15, 2026
+
+### New Feature: Duplicate-Aware Improvement Signal
+
+Made the improvement signal compatible with duplicate model/benchmark handling. When duplicates are hidden, improvements are now calculated against the canonical model/benchmark instead of the duplicate.
+
+**What Changed:**
+1. **Duplicate Benchmarks:** When a duplicate benchmark result is merged into the canonical benchmark column, the improvement now compares to the base model's accuracy on the *canonical* benchmark (not the duplicate)
+2. **Duplicate Base Models:** When the base model name is substituted with the canonical name, the improvement now compares to the *canonical* base model's accuracy (not the duplicate base model)
+
+**Files Modified:**
+- `create_leaderboard_view.sql` - Added 3 new accuracy fields for canonical comparisons:
+  - `canonical_benchmark_base_model_accuracy`: Base model accuracy on canonical benchmark
+  - `canonical_base_model_accuracy`: Canonical base model's accuracy on same benchmark
+  - `canonical_both_base_model_accuracy`: Canonical base model on canonical benchmark
+- `server/storage.ts` - Updated interface and mapping for new fields
+- `server/routes.ts` - Pass through new accuracy fields to frontend
+- `client/src/components/LeaderboardTableWithImprovement.tsx` - Added `recalculateImprovement` helper and updated `processedData` useMemo to dynamically recalculate improvements based on checkbox state
+
+**Behavior Matrix:**
+
+| Show Dup Models | Show Dup Benchmarks | Accuracy Used for Improvement |
+|-----------------|---------------------|-------------------------------|
+| ✓ (checked) | ✓ (checked) | Original `baseModelAccuracy` |
+| ✓ (checked) | ✗ (unchecked) | `canonicalBenchmarkBaseModelAccuracy` |
+| ✗ (unchecked) | ✓ (checked) | `canonicalBaseModelAccuracy` |
+| ✗ (unchecked) | ✗ (unchecked) | `canonicalBothBaseModelAccuracy` |
+
+**Note:** Run the updated `create_leaderboard_view.sql` in Supabase SQL Editor to apply database changes.
+
+---
+
+## January 13, 2026
 
 ### New Feature: Duplicate Benchmark & Model Handling
 

@@ -16,6 +16,7 @@ export default function Leaderboard() {
   const [activeTab, setActiveTab] = useState<'filtered' | 'all'>('filtered');
   const [topN, setTopN] = useState<number>(50);
   const [recentN, setRecentN] = useState<number>(50);
+  const [topPerformerBenchmark, setTopPerformerBenchmark] = useState<string>('dev_set_71_tasks');
   const [modelSearch, setModelSearch] = useState('');
   const [agentSearch, setAgentSearch] = useState('');
   const [baseModelSearch, setBaseModelSearch] = useState('');
@@ -59,27 +60,85 @@ export default function Leaderboard() {
     return Array.from(benchmarkSet).sort();
   }, [pivotedData]);
 
+  // Build a map of duplicate benchmark -> canonical benchmark from the data
+  const benchmarkDuplicateMap = useMemo(() => {
+    const map = new Map<string, string>(); // duplicateName -> canonicalName
+    pivotedData.forEach(row => {
+      Object.entries(row.benchmarks).forEach(([benchmarkName, benchmarkData]) => {
+        if (benchmarkData.benchmarkDuplicateOf && benchmarkData.canonicalBenchmarkName) {
+          map.set(benchmarkName, benchmarkData.canonicalBenchmarkName);
+        }
+      });
+    });
+    return map;
+  }, [pivotedData]);
+
+  // Build reverse map: canonical -> array of duplicate benchmark names
+  const canonicalToDuplicatesMap = useMemo(() => {
+    const map = new Map<string, string[]>(); // canonicalName -> [duplicateName1, duplicateName2, ...]
+    benchmarkDuplicateMap.forEach((canonicalName, duplicateName) => {
+      const existing = map.get(canonicalName) || [];
+      existing.push(duplicateName);
+      map.set(canonicalName, existing);
+    });
+    return map;
+  }, [benchmarkDuplicateMap]);
+
+  // Only canonical benchmarks (not duplicates) for the top performer dropdown
+  const canonicalBenchmarks = useMemo(() => {
+    return availableBenchmarks.filter(benchmark => !benchmarkDuplicateMap.has(benchmark));
+  }, [availableBenchmarks, benchmarkDuplicateMap]);
+
   // Filter by view mode: Top N + Recent N
   const filteredByViewMode = useMemo(() => {
     if (activeTab === 'all') {
       return pivotedData; // No filtering
     }
 
-    // Filter: only rows with dev_set_71_tasks benchmark
-    const dataWithDevSet = pivotedData.filter(row =>
-      row.benchmarks['dev_set_71_tasks'] !== undefined
-    );
+    // Helper function to get accuracy for sorting (canonical or duplicate fallback)
+    const getAccuracyForSorting = (row: PivotedLeaderboardRowWithImprovement, benchmarkName: string): number => {
+      // First try canonical benchmark
+      const canonicalData = row.benchmarks[benchmarkName];
+      if (canonicalData !== undefined) {
+        return canonicalData.accuracy ?? -Infinity;
+      }
+
+      // Fall back to duplicates
+      const duplicates = canonicalToDuplicatesMap.get(benchmarkName) || [];
+      if (duplicates.length === 0) {
+        return -Infinity;
+      }
+
+      // Find duplicate results for this row
+      const duplicateResults = duplicates
+        .map(dupName => row.benchmarks[dupName])
+        .filter(data => data !== undefined);
+
+      if (duplicateResults.length === 0) {
+        return -Infinity;
+      }
+
+      // Use first duplicate's accuracy (duplicates are already deduplicated per model-agent-benchmark)
+      return duplicateResults[0].accuracy ?? -Infinity;
+    };
+
+    // Filter: rows with selected benchmark OR any of its duplicates
+    const duplicatesOfSelected = canonicalToDuplicatesMap.get(topPerformerBenchmark) || [];
+    const dataWithBenchmark = pivotedData.filter(row => {
+      if (row.benchmarks[topPerformerBenchmark] !== undefined) return true;
+      return duplicatesOfSelected.some(dup => row.benchmarks[dup] !== undefined);
+    });
 
     // Filter: only rows with valid latestEvalEndedAt timestamp
     const dataWithTimestamp = pivotedData.filter(row =>
       row.latestEvalEndedAt && row.latestEvalEndedAt !== '—'
     );
 
-    // Top N by dev_set_71_tasks accuracy (descending)
-    const topPerformers = [...dataWithDevSet]
+    // Top N by selected benchmark accuracy (descending), with duplicate fallback
+    const topPerformers = [...dataWithBenchmark]
       .sort((a, b) => {
-        const accuracyA = a.benchmarks['dev_set_71_tasks']?.accuracy ?? -Infinity;
-        const accuracyB = b.benchmarks['dev_set_71_tasks']?.accuracy ?? -Infinity;
+        const accuracyA = getAccuracyForSorting(a, topPerformerBenchmark);
+        const accuracyB = getAccuracyForSorting(b, topPerformerBenchmark);
         return accuracyB - accuracyA;
       })
       .slice(0, topN === Number.MAX_SAFE_INTEGER ? undefined : topN);
@@ -103,7 +162,7 @@ export default function Leaderboard() {
     });
 
     return Array.from(uniqueMap.values());
-  }, [pivotedData, activeTab, topN, recentN]);
+  }, [pivotedData, activeTab, topN, recentN, topPerformerBenchmark, canonicalToDuplicatesMap]);
 
   // Initialize selectedBenchmarks with defaults when data first loads
   useEffect(() => {
@@ -183,6 +242,9 @@ export default function Leaderboard() {
               onTopNChange={setTopN}
               onRecentNChange={setRecentN}
               currentCount={filteredByViewMode.length}
+              availableBenchmarks={canonicalBenchmarks}
+              topPerformerBenchmark={topPerformerBenchmark}
+              onTopPerformerBenchmarkChange={setTopPerformerBenchmark}
             />
 
             <SearchBarWithBaseModel

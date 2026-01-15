@@ -13,6 +13,10 @@ export interface BenchmarkResultWithImprovement extends BenchmarkResultExtended 
   baseModelId: string | null;
   baseModelName: string;
   baseModelAccuracy?: number;
+  // Additional accuracy values for duplicate-aware improvement calculation
+  canonicalBenchmarkBaseModelAccuracy?: number;  // Base model accuracy on canonical benchmark
+  canonicalBaseModelAccuracy?: number;            // Canonical base model's accuracy on same benchmark
+  canonicalBothBaseModelAccuracy?: number;        // Canonical base model on canonical benchmark
   agentId: string;
   benchmarkId: string;
   endedAt?: string;
@@ -92,6 +96,10 @@ export class DbStorage implements IStorage {
       baseModelId: row.base_model_id,
       baseModelName: row.base_model_name,
       baseModelAccuracy: row.base_model_accuracy ?? undefined,
+      // Additional accuracy values for duplicate-aware improvement calculation
+      canonicalBenchmarkBaseModelAccuracy: row.canonical_benchmark_base_model_accuracy ?? undefined,
+      canonicalBaseModelAccuracy: row.canonical_base_model_accuracy ?? undefined,
+      canonicalBothBaseModelAccuracy: row.canonical_both_base_model_accuracy ?? undefined,
       agentId: row.agent_id,
       benchmarkId: row.benchmark_id,
       // Duplicate tracking fields

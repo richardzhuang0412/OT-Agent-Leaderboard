@@ -145,6 +145,10 @@ Main page: `client/src/pages/Leaderboard.tsx` (manages filters and data fetching
 - `FilterControls` - Multi-select dropdowns (client-side filtering):
   - Model/Agent filters: Control which **rows** are displayed
   - Benchmark filter: Controls which **columns** are displayed
+- `ViewModeControls` - View mode filters (on "Filtered View" tab only):
+  - Top N Performers: Select N and which benchmark to rank by (default: `dev_set_71_tasks`)
+  - N Most Recent: Select N most recently evaluated models
+  - Results are unioned (rows in either top N OR most recent N are shown)
 - `LeaderboardTable` - Pivoted table component:
   - Fixed columns: Model Name, Agent Name
   - Dynamic columns: One column per visible benchmark showing "accuracy% ± standard_error"
@@ -203,6 +207,7 @@ From `design_guidelines.md`:
 - Dark mode primary with light mode support
 - Inter font for UI, JetBrains Mono for metrics
 - Professional, research-appropriate aesthetic
+- Full-width layout: Table expands to fill browser window (no max-width constraint)
 
 ## Common Tasks
 
@@ -276,6 +281,49 @@ Key unified_db functions:
 **View Behavior:**
 - The view deduplicates using `DISTINCT ON (a.name, m.name, b.name)` and orders by `ended_at DESC`, so only the **latest** job result for each combination appears
 - Click the Refresh button on the leaderboard to reload data from the API
+
+### Duplicate Benchmark and Model Handling
+
+The database schema supports marking benchmarks and models as duplicates of canonical entries via `duplicate_of` foreign key fields. The leaderboard handles these intelligently:
+
+**Database Schema:**
+- `models.duplicate_of` - UUID reference to canonical model
+- `benchmarks.duplicate_of` - UUID reference to canonical benchmark
+
+**UI Controls:**
+Two checkboxes near the filter controls (on both "Filtered View" and "All Models" tabs):
+- "Show duplicate benchmarks" (default: unchecked)
+- "Show duplicate models" (default: unchecked)
+
+**Behavior when checkboxes are unchecked (default):**
+1. **Duplicate Benchmarks**: Columns for duplicate benchmarks are hidden. If a row has a result for a duplicate benchmark but NOT the canonical benchmark, the canonical column is filled with the duplicate's result (intelligent merging).
+2. **Duplicate Models**: Rows for duplicate models are filtered out. Base model names are substituted with canonical model names where applicable.
+
+**Duplicate-Aware Improvement Signal:**
+
+When duplicates are hidden, the improvement signal (pp) is recalculated to compare against canonical models/benchmarks instead of duplicates:
+
+| Show Dup Models | Show Dup Benchmarks | Improvement Compares To |
+|-----------------|---------------------|-------------------------|
+| ✓ checked | ✓ checked | Original base model on original benchmark |
+| ✓ checked | ✗ unchecked | Original base model on **canonical** benchmark |
+| ✗ unchecked | ✓ checked | **Canonical** base model on original benchmark |
+| ✗ unchecked | ✗ unchecked | **Canonical** base model on **canonical** benchmark |
+
+The SQL view provides four accuracy values for this:
+- `base_model_accuracy` - Original base model on original benchmark
+- `canonical_benchmark_base_model_accuracy` - Original base model on canonical benchmark
+- `canonical_base_model_accuracy` - Canonical base model on original benchmark
+- `canonical_both_base_model_accuracy` - Canonical base model on canonical benchmark
+
+The frontend's `processedData` useMemo in `LeaderboardTableWithImprovement.tsx` uses the `recalculateImprovement` helper to dynamically select the correct accuracy value based on checkbox state.
+
+**Implementation layers:**
+1. `create_leaderboard_view.sql` - Exposes `duplicate_of` fields, canonical names via LEFT JOINs, and 4 base model accuracy variants
+2. `server/storage.ts` - `BenchmarkResultWithImprovement` interface includes duplicate tracking fields and canonical accuracy fields
+3. `server/routes.ts` - API includes `modelDuplicateOf`, `canonicalModelName`, `benchmarkDuplicateOf`, `canonicalBenchmarkName`, and canonical accuracy values
+4. `LeaderboardTableWithImprovement.tsx` - `processedData` useMemo handles filtering/merging and improvement recalculation based on checkbox state
+5. `Leaderboard.tsx` - Manages `showDuplicateBenchmarks` and `showDuplicateModels` state
 
 ### Modifying the Data Transformation (Pivoting)
 
@@ -390,16 +438,18 @@ Currently fixed columns are: Model Name, Agent Name. To add more (e.g., Model Si
 ## File Structure Reference
 
 Key files for common modifications:
-- **Client UI**: `client/src/pages/Leaderboard.tsx` - Main layout and state
-- **Data Display**: `client/src/components/LeaderboardTable.tsx` - Table rendering and sorting
-- **Filtering**: `client/src/components/FilterControls.tsx` and `SearchBar.tsx` - Filter UI
-- **API**: `server/routes.ts` - `/api/leaderboard-pivoted` endpoint (data transformation)
-- **Data Access**: `server/storage.ts` - Database query abstraction
-- **Database View**: `create_leaderboard_view.sql` - Supabase view definition
+- **Client UI**: `client/src/pages/Leaderboard.tsx` - Main layout, state, filter/duplicate checkboxes
+- **Data Display**: `client/src/components/LeaderboardTableWithImprovement.tsx` - Main table with improvement metrics, duplicate handling, sorting
+- **Filtering**: `client/src/components/FilterControlsWithBaseModel.tsx` and `SearchBarWithBaseModel.tsx` - Filter/search UI
+- **View Mode**: `client/src/components/ViewModeControls.tsx` - Top N Performers (by benchmark) and N Most Recent controls
+- **Config**: `client/src/config/benchmarkConfig.ts` - Benchmark exclusions, default visible benchmarks
+- **API**: `server/routes.ts` - `/api/leaderboard-pivoted-with-improvement` endpoint (data transformation)
+- **Data Access**: `server/storage.ts` - Database query abstraction, `BenchmarkResultWithImprovement` interface
+- **Database View**: `create_leaderboard_view.sql` - Supabase view with duplicate tracking fields
 - **Types**: `shared/schema.ts` - Shared TypeScript types and Zod schemas
 
 **Database Backend (dcagents-leaderboard/unified_db/):**
-- `complete_schema.sql` - Full PostgreSQL schema with all tables
+- `complete_schema.sql` - Full PostgreSQL schema with all tables (includes `duplicate_of` fields)
 - `__init__.py` - Exported Python API functions
 - `utils.py` - Core implementation of registration functions
 - `models.py` - Pydantic models for data validation

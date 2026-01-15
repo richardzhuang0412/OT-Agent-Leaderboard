@@ -136,6 +136,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           hfTracesLink?: string;
           baseModelAccuracy?: number;
           improvement?: number;
+          // Additional accuracy values for duplicate-aware improvement recalculation
+          canonicalBenchmarkBaseModelAccuracy?: number;
+          canonicalBaseModelAccuracy?: number;
+          canonicalBothBaseModelAccuracy?: number;
           // Duplicate tracking for benchmarks
           benchmarkDuplicateOf: string | null;
           canonicalBenchmarkName: string;
@@ -181,6 +185,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           hfTracesLink: result.hfTracesLink,
           baseModelAccuracy: result.baseModelAccuracy,
           improvement: improvement,
+          // Additional accuracy values for duplicate-aware improvement recalculation
+          canonicalBenchmarkBaseModelAccuracy: result.canonicalBenchmarkBaseModelAccuracy,
+          canonicalBaseModelAccuracy: result.canonicalBaseModelAccuracy,
+          canonicalBothBaseModelAccuracy: result.canonicalBothBaseModelAccuracy,
           // Duplicate tracking for benchmarks
           benchmarkDuplicateOf: result.benchmarkDuplicateOf,
           canonicalBenchmarkName: result.canonicalBenchmarkName

@@ -14,6 +14,9 @@ interface ViewModeControlsProps {
   onTopNChange: (value: number) => void;
   onRecentNChange: (value: number) => void;
   currentCount: number;
+  availableBenchmarks: string[];
+  topPerformerBenchmark: string;
+  onTopPerformerBenchmarkChange: (value: string) => void;
 }
 
 const DISPLAY_OPTIONS = [
@@ -33,6 +36,9 @@ export default function ViewModeControls({
   onTopNChange,
   onRecentNChange,
   currentCount,
+  availableBenchmarks,
+  topPerformerBenchmark,
+  onTopPerformerBenchmarkChange,
 }: ViewModeControlsProps) {
   const handleTopNChange = (value: string) => {
     const numValue = value === 'all' ? Number.MAX_SAFE_INTEGER : parseInt(value, 10);
@@ -57,7 +63,7 @@ export default function ViewModeControls({
           <div className="flex items-center gap-3">
             <Trophy className="w-4 h-4 text-muted-foreground" />
             <label htmlFor="top-n-select" className="text-sm font-medium text-foreground">
-              Top N Performers:
+              Top
             </label>
             <Select
               value={getCurrentValueString(topN)}
@@ -70,6 +76,22 @@ export default function ViewModeControls({
                 {DISPLAY_OPTIONS.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="text-sm font-medium text-foreground">Performers by</span>
+            <Select
+              value={topPerformerBenchmark}
+              onValueChange={onTopPerformerBenchmarkChange}
+            >
+              <SelectTrigger id="benchmark-select" className="w-64">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {availableBenchmarks.map((benchmark) => (
+                  <SelectItem key={benchmark} value={benchmark}>
+                    {benchmark}
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -52,7 +52,46 @@ SELECT DISTINCT ON (a.name, m.name, b.name)
       AND bsj.metrics IS NOT NULL
     ORDER BY COALESCE(bsj.ended_at, bsj.created_at) ASC
     LIMIT 1
-  ) as base_model_accuracy
+  ) as base_model_accuracy,
+  -- Base model accuracy on CANONICAL benchmark (for duplicate benchmark handling)
+  (
+    SELECT (elem->>'value')::float * 100
+    FROM sandbox_jobs bsj
+    INNER JOIN jsonb_array_elements(bsj.metrics) elem ON TRUE
+    WHERE bsj.agent_id = sj.agent_id
+      AND bsj.model_id = m.base_model_id
+      AND bsj.benchmark_id = COALESCE(b.duplicate_of, sj.benchmark_id)
+      AND elem->>'name' = 'accuracy'
+      AND bsj.metrics IS NOT NULL
+    ORDER BY COALESCE(bsj.ended_at, bsj.created_at) ASC
+    LIMIT 1
+  ) as canonical_benchmark_base_model_accuracy,
+  -- CANONICAL base model's accuracy on same benchmark (for duplicate base model handling)
+  (
+    SELECT (elem->>'value')::float * 100
+    FROM sandbox_jobs bsj
+    INNER JOIN jsonb_array_elements(bsj.metrics) elem ON TRUE
+    WHERE bsj.agent_id = sj.agent_id
+      AND bsj.model_id = COALESCE(bm.duplicate_of, m.base_model_id)
+      AND bsj.benchmark_id = sj.benchmark_id
+      AND elem->>'name' = 'accuracy'
+      AND bsj.metrics IS NOT NULL
+    ORDER BY COALESCE(bsj.ended_at, bsj.created_at) ASC
+    LIMIT 1
+  ) as canonical_base_model_accuracy,
+  -- CANONICAL base model on CANONICAL benchmark (for both duplicate handling)
+  (
+    SELECT (elem->>'value')::float * 100
+    FROM sandbox_jobs bsj
+    INNER JOIN jsonb_array_elements(bsj.metrics) elem ON TRUE
+    WHERE bsj.agent_id = sj.agent_id
+      AND bsj.model_id = COALESCE(bm.duplicate_of, m.base_model_id)
+      AND bsj.benchmark_id = COALESCE(b.duplicate_of, sj.benchmark_id)
+      AND elem->>'name' = 'accuracy'
+      AND bsj.metrics IS NOT NULL
+    ORDER BY COALESCE(bsj.ended_at, bsj.created_at) ASC
+    LIMIT 1
+  ) as canonical_both_base_model_accuracy
 FROM sandbox_jobs sj
 INNER JOIN agents a ON sj.agent_id = a.id
 INNER JOIN models m ON sj.model_id = m.id

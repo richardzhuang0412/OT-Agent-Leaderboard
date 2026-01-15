@@ -30,6 +30,10 @@ export interface PivotedLeaderboardRowWithImprovement {
     hfTracesLink?: string;
     baseModelAccuracy?: number;
     improvement?: number;
+    // Additional accuracy values for duplicate-aware improvement recalculation
+    canonicalBenchmarkBaseModelAccuracy?: number;
+    canonicalBaseModelAccuracy?: number;
+    canonicalBothBaseModelAccuracy?: number;
     // Duplicate tracking for benchmarks
     benchmarkDuplicateOf: string | null;
     canonicalBenchmarkName: string;
@@ -108,9 +112,49 @@ export default function LeaderboardTableWithImprovement({
     return map;
   }, [data]);
 
-  // Process data to handle duplicate models
+  // Helper function to recalculate improvement based on display settings
+  const recalculateImprovement = (
+    benchmarkData: {
+      accuracy: number;
+      baseModelAccuracy?: number;
+      canonicalBenchmarkBaseModelAccuracy?: number;
+      canonicalBaseModelAccuracy?: number;
+      canonicalBothBaseModelAccuracy?: number;
+    },
+    useCanonicalBaseModel: boolean,
+    useCanonicalBenchmark: boolean
+  ): { baseModelAccuracy?: number; improvement?: number } => {
+    // Determine which base model accuracy to use based on display settings
+    let newBaseModelAccuracy: number | undefined;
+
+    if (useCanonicalBaseModel && useCanonicalBenchmark) {
+      // Both duplicates hidden: use canonical base model on canonical benchmark
+      newBaseModelAccuracy = benchmarkData.canonicalBothBaseModelAccuracy ?? benchmarkData.baseModelAccuracy;
+    } else if (useCanonicalBaseModel) {
+      // Only duplicate models hidden: use canonical base model on same benchmark
+      newBaseModelAccuracy = benchmarkData.canonicalBaseModelAccuracy ?? benchmarkData.baseModelAccuracy;
+    } else if (useCanonicalBenchmark) {
+      // Only duplicate benchmarks hidden: use original base model on canonical benchmark
+      newBaseModelAccuracy = benchmarkData.canonicalBenchmarkBaseModelAccuracy ?? benchmarkData.baseModelAccuracy;
+    } else {
+      // Both shown: use original values
+      newBaseModelAccuracy = benchmarkData.baseModelAccuracy;
+    }
+
+    const newImprovement = newBaseModelAccuracy !== undefined
+      ? benchmarkData.accuracy - newBaseModelAccuracy
+      : undefined;
+
+    return { baseModelAccuracy: newBaseModelAccuracy, improvement: newImprovement };
+  };
+
+  // Process data to handle duplicate models and recalculate improvements
   const processedData = useMemo(() => {
     let processed = data;
+
+    // Determine flags for improvement recalculation
+    const useCanonicalBaseModel = !showDuplicateModels;
+    const useCanonicalBenchmark = !showDuplicateBenchmarks;
 
     // If not showing duplicate models, filter them out and substitute base model names
     if (!showDuplicateModels) {
@@ -119,7 +163,22 @@ export default function LeaderboardTableWithImprovement({
         .map(row => ({
           ...row,
           // Substitute base model name with canonical name
-          baseModelName: row.canonicalBaseModelName
+          baseModelName: row.canonicalBaseModelName,
+          // Recalculate improvements for all benchmarks using canonical base model
+          benchmarks: Object.fromEntries(
+            Object.entries(row.benchmarks).map(([benchmarkName, benchmarkData]) => {
+              const { baseModelAccuracy, improvement } = recalculateImprovement(
+                benchmarkData,
+                useCanonicalBaseModel,
+                useCanonicalBenchmark
+              );
+              return [benchmarkName, {
+                ...benchmarkData,
+                baseModelAccuracy,
+                improvement
+              }];
+            })
+          )
         }));
     }
 
@@ -135,11 +194,21 @@ export default function LeaderboardTableWithImprovement({
 
           // If we have duplicate data but no canonical data, copy it over
           if (duplicateData && !canonicalData) {
+            // Recalculate improvement for merged data (comparing to canonical benchmark)
+            const { baseModelAccuracy, improvement } = recalculateImprovement(
+              duplicateData,
+              useCanonicalBaseModel,
+              true // Always use canonical benchmark since we're merging into canonical column
+            );
+
             newBenchmarks[canonicalName] = {
               ...duplicateData,
               // Update the canonical name reference
               canonicalBenchmarkName: canonicalName,
-              benchmarkDuplicateOf: null
+              benchmarkDuplicateOf: null,
+              // Update base model accuracy and improvement
+              baseModelAccuracy,
+              improvement
             };
           }
         });
