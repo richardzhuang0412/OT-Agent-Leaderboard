@@ -143,6 +143,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Duplicate tracking for benchmarks
           benchmarkDuplicateOf: string | null;
           canonicalBenchmarkName: string;
+          // Source benchmark (tracks which actual benchmark the result came from)
+          sourceBenchmarkName: string;
+          sourceBenchmarkId: string;
         }>;
       }>();
 
@@ -191,7 +194,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           canonicalBothBaseModelAccuracy: result.canonicalBothBaseModelAccuracy,
           // Duplicate tracking for benchmarks
           benchmarkDuplicateOf: result.benchmarkDuplicateOf,
-          canonicalBenchmarkName: result.canonicalBenchmarkName
+          canonicalBenchmarkName: result.canonicalBenchmarkName,
+          // Source benchmark (tracks which actual benchmark the result came from)
+          sourceBenchmarkName: result.sourceBenchmarkName,
+          sourceBenchmarkId: result.sourceBenchmarkId
         };
       }
 

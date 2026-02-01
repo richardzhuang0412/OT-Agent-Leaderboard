@@ -388,6 +388,23 @@ export default function Leaderboard() {
               </div>
             </div>
 
+            {/* Result Selection */}
+            <div className="space-y-2">
+              <div className="flex items-start gap-2">
+                <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-foreground">Result Selection</p>
+                  <p className="text-xs">
+                    For each model/agent/benchmark combination, results from equivalent benchmarks
+                    (canonical + duplicates) are merged into one pool. From this merged pool,
+                    the first evaluation with accuracy above 1% is displayed. If no evaluation
+                    meets this threshold, the earliest evaluation is shown instead. This ensures
+                    glitchy 0% runs are deprioritized while considering all equivalent benchmark results.
+                  </p>
+                </div>
+              </div>
+            </div>
+
           </div>
 
             {/* Table */}
@@ -546,6 +563,23 @@ export default function Leaderboard() {
                     <p className="font-medium text-foreground">Timestamp Columns</p>
                     <p className="text-xs"><strong>First Eval Ended At:</strong> The earliest evaluation completion time across all benchmarks for this model+agent combination.</p>
                     <p className="text-xs mt-1"><strong>Latest Eval Ended At:</strong> The most recent evaluation completion time across all benchmarks for this model+agent combination.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Result Selection */}
+              <div className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-foreground">Result Selection</p>
+                    <p className="text-xs">
+                      For each model/agent/benchmark combination, results from equivalent benchmarks
+                      (canonical + duplicates) are merged into one pool. From this merged pool,
+                      the first evaluation with accuracy above 1% is displayed. If no evaluation
+                      meets this threshold, the earliest evaluation is shown instead. This ensures
+                      glitchy 0% runs are deprioritized while considering all equivalent benchmark results.
+                    </p>
                   </div>
                 </div>
               </div>

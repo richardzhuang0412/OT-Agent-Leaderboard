@@ -81,7 +81,13 @@ The application uses a Supabase database with the following key tables:
 - `sandbox_trials` - Individual trial results for each job
 - `sandbox_tasks` - Task definitions used in benchmarks
 
-The leaderboard reads from a `leaderboard_results` view that aggregates data from `sandbox_jobs`, keeping the latest valid result per (model, agent, benchmark) combination.
+The leaderboard reads from a `leaderboard_results` view that aggregates data from `sandbox_jobs`, keeping the best valid result per (model, agent, canonical_benchmark) combination. The view uses **merge-then-threshold** selection:
+
+1. For each (model, agent, canonical_benchmark), results from the canonical benchmark AND all its duplicates are merged into one pool
+2. From this merged pool, the first evaluation with accuracy > 1.0% is selected (to deprioritize "glitchy" 0% runs)
+3. If no evaluation meets the threshold, the earliest evaluation is shown as a fallback
+
+This ensures that if a model has a 0% result on a canonical benchmark but a valid 45% result on its duplicate, the 45% result will be displayed.
 
 ### Database Schema (unified_db)
 
@@ -97,17 +103,28 @@ sandbox_jobs (agent_id → agents.id, model_id → models.id, benchmark_id → b
 leaderboard_results VIEW (aggregates sandbox_jobs by model/agent/benchmark, extracts accuracy metrics)
 ```
 
-The `leaderboard_results` view extracts `accuracy` and `accuracy_stderr` from the `metrics` JSONB array in `sandbox_jobs`:
+The `leaderboard_results` view extracts `accuracy` and `accuracy_stderr` from the `metrics` JSONB array in `sandbox_jobs`. It uses **merge-then-threshold** selection to group results by canonical benchmark and deprioritize glitchy 0% accuracy results:
 ```sql
-SELECT DISTINCT ON (a.name, m.name, b.name)
-  m.name as model_name, a.name as agent_name, b.name as benchmark_name,
-  (SELECT (elem->>'value')::float * 100 FROM jsonb_array_elements(sj.metrics) elem WHERE elem->>'name' = 'accuracy') as accuracy,
-  (SELECT (elem->>'value')::float * 100 FROM jsonb_array_elements(sj.metrics) elem WHERE elem->>'name' = 'accuracy_stderr') as standard_error
-FROM sandbox_jobs sj
-JOIN agents a ON sj.agent_id = a.id
-JOIN models m ON sj.model_id = m.id
-JOIN benchmarks b ON sj.benchmark_id = b.id
-ORDER BY a.name, m.name, b.name, COALESCE(sj.ended_at, sj.created_at) DESC;
+WITH job_metrics AS (
+  SELECT sj.*,
+    COALESCE(sj.ended_at, sj.created_at) as job_timestamp,
+    (SELECT (elem->>'value')::float * 100 FROM jsonb_array_elements(sj.metrics) elem WHERE elem->>'name' = 'accuracy' LIMIT 1) as computed_accuracy
+  FROM sandbox_jobs sj WHERE sj.metrics IS NOT NULL
+)
+-- Group by CANONICAL benchmark (merges duplicates before threshold selection)
+SELECT DISTINCT ON (a.name, m.name, COALESCE(b_canonical.name, b.name))
+  m.name as model_name, a.name as agent_name,
+  COALESCE(b_canonical.name, b.name) as benchmark_name,  -- canonical name
+  b.name as source_benchmark_name,                        -- original benchmark
+  jm.computed_accuracy as accuracy, ...
+FROM job_metrics jm
+JOIN agents a ON jm.agent_id = a.id
+JOIN models m ON jm.model_id = m.id
+JOIN benchmarks b ON jm.benchmark_id = b.id
+LEFT JOIN benchmarks b_canonical ON b.duplicate_of = b_canonical.id
+ORDER BY a.name, m.name, COALESCE(b_canonical.name, b.name),
+         CASE WHEN jm.computed_accuracy > 1.0 THEN 0 ELSE 1 END,  -- prefer above-threshold
+         jm.job_timestamp ASC;                                     -- then earliest
 ```
 
 ### API Endpoints

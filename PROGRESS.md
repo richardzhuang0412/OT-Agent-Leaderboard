@@ -1,6 +1,69 @@
 # Leaderboard Development Progress
 
-## Latest Update: January 15, 2026
+## Latest Update: February 1, 2026
+
+### Enhancement: Merge-Then-Threshold Selection Logic
+
+Updated the result selection to merge results across duplicate benchmarks BEFORE applying threshold selection. This ensures the best valid result is selected from the entire pool of equivalent benchmarks.
+
+**Previous Behavior:** Threshold selection was applied per-benchmark-id. A model with 0% on canonical benchmark and 45% on its duplicate would show 0% for the canonical column.
+
+**New Behavior (Merge-Then-Threshold):**
+1. For each (model, agent, canonical_benchmark), merge all results from canonical + duplicate benchmarks into one pool
+2. From this merged pool, select the first evaluation with accuracy > 1.0%
+3. If none meet threshold, fall back to earliest evaluation
+
+**Implementation:**
+- Changed `DISTINCT ON` from `(a.name, m.name, b.name)` to `(a.name, m.name, COALESCE(b_canonical.name, b.name))`
+- Changed `ORDER BY` to group by canonical benchmark name
+- Added `source_benchmark_name` and `source_benchmark_id` fields to track which actual benchmark the result came from
+- Updated base model accuracy subqueries to also merge across duplicate benchmarks
+
+**Files Modified:**
+- `create_leaderboard_view.sql` - Merge-then-threshold logic, new source tracking fields
+- `server/storage.ts` - Added `sourceBenchmarkName` and `sourceBenchmarkId` to interface
+- `server/routes.ts` - Pass through new source fields to frontend
+- `client/src/components/LeaderboardTableWithImprovement.tsx` - Updated interface for new fields
+- `client/src/pages/Leaderboard.tsx` - Added "Result Selection" info section (both tabs)
+
+**Note:** The "Show duplicate benchmarks" checkbox is now less relevant since merging happens at the SQL level. All benchmark columns show canonical names.
+
+**Database Update Required:** Run the updated `create_leaderboard_view.sql` in Supabase SQL Editor.
+
+---
+
+### New Feature: Result Selection Info Section
+
+Added a new informational section to the leaderboard UI explaining the merge-then-threshold result selection logic.
+
+**Location:** Info panel on both "Filtered View" and "All Models" tabs (section 6 of 6)
+
+---
+
+### Previous: Threshold-Based Eval Result Selection
+
+Fixed issue where early "glitchy" evaluations with 0% accuracy were displayed instead of correct results. The leaderboard now uses intelligent threshold-based selection.
+
+**Problem:** The view used `ORDER BY timestamp ASC` keeping the earliest eval, but some early runs had 0% accuracy due to glitches.
+
+**Solution:** For each (model, agent, benchmark) combination:
+1. Prefer the **first evaluation with accuracy > 1.0%** (deprioritizes glitchy 0% runs)
+2. If no evaluation meets the threshold, **fall back to the first evaluation** (still shows results when no good evals exist)
+
+**Implementation:**
+- Added CTE (`job_metrics`) to pre-compute accuracy before ordering
+- Changed `ORDER BY` to use `CASE WHEN computed_accuracy > 1.0 THEN 0 ELSE 1 END` to prioritize above-threshold results
+- Applied threshold-aware ordering to all 5 selection points: main query + 4 base model accuracy subqueries
+
+**Files Modified:**
+- `create_leaderboard_view.sql` - Added CTE with pre-computed accuracy, threshold-aware ordering in main query and all 4 base model accuracy subqueries
+- `CLAUDE.md` - Updated documentation to describe new threshold behavior
+
+**Note:** Run the updated `create_leaderboard_view.sql` in Supabase SQL Editor to apply database changes.
+
+---
+
+## January 15, 2026
 
 ### New Feature: Configurable "Top N Performers by Benchmark" with Duplicate Support
 

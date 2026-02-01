@@ -37,6 +37,9 @@ export interface PivotedLeaderboardRowWithImprovement {
     // Duplicate tracking for benchmarks
     benchmarkDuplicateOf: string | null;
     canonicalBenchmarkName: string;
+    // Source benchmark (tracks which actual benchmark the result came from)
+    sourceBenchmarkName?: string;
+    sourceBenchmarkId?: string;
   }>;
 }
 

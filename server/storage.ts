@@ -27,6 +27,9 @@ export interface BenchmarkResultWithImprovement extends BenchmarkResultExtended 
   canonicalBaseModelName: string;
   benchmarkDuplicateOf: string | null;
   canonicalBenchmarkName: string;
+  // Source benchmark (tracks which actual benchmark the result came from after merging duplicates)
+  sourceBenchmarkName: string;
+  sourceBenchmarkId: string;
 }
 
 export interface IStorage {
@@ -109,6 +112,9 @@ export class DbStorage implements IStorage {
       canonicalBaseModelName: row.canonical_base_model_name ?? row.base_model_name,
       benchmarkDuplicateOf: row.benchmark_duplicate_of ?? null,
       canonicalBenchmarkName: row.canonical_benchmark_name ?? row.benchmark_name,
+      // Source benchmark (tracks which actual benchmark the result came from after merging duplicates)
+      sourceBenchmarkName: row.source_benchmark_name ?? row.benchmark_name,
+      sourceBenchmarkId: row.source_benchmark_id ?? row.benchmark_id,
     }));
   }
 
