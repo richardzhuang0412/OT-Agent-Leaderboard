@@ -126,6 +126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         baseModelName: string;
         firstEvalEndedAt?: string;
         latestEvalEndedAt?: string;
+        modelCreatedAt?: string;
         // Duplicate tracking fields
         modelDuplicateOf: string | null;
         canonicalModelName: string;
@@ -199,6 +200,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sourceBenchmarkName: result.sourceBenchmarkName,
           sourceBenchmarkId: result.sourceBenchmarkId
         };
+      }
+
+      // Fetch all registered models and merge those without evaluations
+      const allModels = await storage.getAllModels();
+
+      // Build a map of modelId -> creationTime for adding modelCreatedAt to all entries
+      const modelCreationTimeMap = new Map<string, string>();
+      for (const model of allModels) {
+        if (model.creationTime) {
+          modelCreationTimeMap.set(model.modelId, model.creationTime);
+        }
+      }
+
+      // Add modelCreatedAt to existing entries
+      groupedData.forEach((group) => {
+        const creationTime = modelCreationTimeMap.get(group.modelId);
+        if (creationTime) {
+          group.modelCreatedAt = new Date(creationTime).toISOString().split('T')[0] + ' ' + new Date(creationTime).toTimeString().split(' ')[0];
+        }
+      });
+
+      // Add models without evaluations
+      for (const model of allModels) {
+        const key = `${model.modelName}|||${model.agentName}`;
+        if (!groupedData.has(key)) {
+          groupedData.set(key, {
+            modelName: model.modelName,
+            agentName: model.agentName,
+            modelId: model.modelId,
+            baseModelName: model.baseModelName,
+            firstEvalEndedAt: undefined,
+            latestEvalEndedAt: undefined,
+            modelCreatedAt: model.creationTime
+              ? new Date(model.creationTime).toISOString().split('T')[0] + ' ' + new Date(model.creationTime).toTimeString().split(' ')[0]
+              : undefined,
+            modelDuplicateOf: model.modelDuplicateOf,
+            canonicalModelName: model.canonicalModelName,
+            canonicalBaseModelName: model.canonicalBaseModelName,
+            benchmarks: {}
+          });
+        }
       }
 
       // Convert to array and sort by model name, then agent name

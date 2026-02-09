@@ -18,6 +18,7 @@ export interface PivotedLeaderboardRowWithImprovement {
   agentName: string;
   firstEvalEndedAt?: string;
   latestEvalEndedAt?: string;
+  modelCreatedAt?: string;
   modelId: string;
   baseModelName: string;
   // Duplicate tracking fields

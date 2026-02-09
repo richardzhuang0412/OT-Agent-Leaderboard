@@ -32,9 +32,24 @@ export interface BenchmarkResultWithImprovement extends BenchmarkResultExtended 
   sourceBenchmarkId: string;
 }
 
+export interface ModelInfo {
+  modelId: string;
+  modelName: string;
+  agentId: string;
+  agentName: string;
+  baseModelId: string | null;
+  baseModelName: string;
+  modelDuplicateOf: string | null;
+  canonicalModelName: string;
+  baseModelDuplicateOf: string | null;
+  canonicalBaseModelName: string;
+  creationTime: string | null;
+}
+
 export interface IStorage {
   getAllBenchmarkResults(): Promise<BenchmarkResultExtended[]>;
   getAllBenchmarkResultsWithImprovement(): Promise<BenchmarkResultWithImprovement[]>;
+  getAllModels(): Promise<ModelInfo[]>;
   getBenchmarkResult(id: string): Promise<BenchmarkResult | undefined>;
   createBenchmarkResult(result: InsertBenchmarkResult): Promise<BenchmarkResult>;
   deleteBenchmarkResult(id: string): Promise<void>;
@@ -116,6 +131,60 @@ export class DbStorage implements IStorage {
       sourceBenchmarkName: row.source_benchmark_name ?? row.benchmark_name,
       sourceBenchmarkId: row.source_benchmark_id ?? row.benchmark_id,
     }));
+  }
+
+  async getAllModels(): Promise<ModelInfo[]> {
+    // Query models joined with agents to get all registered models
+    const { data, error } = await supabase
+      .from('models')
+      .select('id, name, agent_id, base_model_id, duplicate_of, creation_time, agents!inner(id, name)');
+
+    if (error) {
+      console.error('Error fetching models:', error);
+      throw error;
+    }
+
+    if (!data) {
+      return [];
+    }
+
+    // Build a map of model id -> model row for resolving self-references
+    const modelMap = new Map<string, any>();
+    for (const row of data) {
+      modelMap.set(row.id, row);
+    }
+
+    return data.map(row => {
+      // Resolve base model name from base_model_id
+      const baseModel = row.base_model_id ? modelMap.get(row.base_model_id) : null;
+      const baseModelName = baseModel ? baseModel.name : 'None';
+
+      // Resolve canonical model name from duplicate_of
+      const canonicalModel = row.duplicate_of ? modelMap.get(row.duplicate_of) : null;
+      const canonicalModelName = canonicalModel ? canonicalModel.name : row.name;
+
+      // Resolve base model's duplicate_of
+      const baseModelDuplicateOf = baseModel ? (baseModel.duplicate_of ?? null) : null;
+      const canonicalBaseModel = baseModelDuplicateOf ? modelMap.get(baseModelDuplicateOf) : null;
+      const canonicalBaseModelName = canonicalBaseModel ? canonicalBaseModel.name : baseModelName;
+
+      // Handle agents join result - Supabase returns as object for !inner join
+      const agent = row.agents as unknown as { id: string; name: string };
+
+      return {
+        modelId: row.id,
+        modelName: row.name,
+        agentId: agent.id,
+        agentName: agent.name,
+        baseModelId: row.base_model_id ?? null,
+        baseModelName,
+        modelDuplicateOf: row.duplicate_of ?? null,
+        canonicalModelName,
+        baseModelDuplicateOf,
+        canonicalBaseModelName,
+        creationTime: row.creation_time ?? null,
+      };
+    });
   }
 
   async getBenchmarkResult(id: string): Promise<BenchmarkResult | undefined> {

@@ -1,6 +1,30 @@
 # Leaderboard Development Progress
 
-## Latest Update: February 1, 2026
+## Latest Update: February 9, 2026
+
+### Feature: Show Models Without Evaluations on the Leaderboard
+
+Models registered in the database but without evaluation results (`sandbox_jobs`) now appear on the leaderboard with "---" in all benchmark columns.
+
+**Approach:** Separate query for all models from the `models` table, merged server-side into the existing pivoted response. No SQL view changes needed.
+
+**Files Modified:**
+- `server/storage.ts` - Added `ModelInfo` interface and `getAllModels()` method (queries `models` with `INNER JOIN agents`, resolves `base_model_id`/`duplicate_of` self-references in memory)
+- `server/routes.ts` - In `/api/leaderboard-pivoted-with-improvement`: fetches all models, adds `modelCreatedAt` to all entries, creates new entries for models without evals (empty benchmarks)
+- `client/src/components/LeaderboardTableWithImprovement.tsx` - Added `modelCreatedAt?: string` to `PivotedLeaderboardRowWithImprovement` interface
+- `client/src/pages/Leaderboard.tsx` - "N Most Recent" uses `modelCreatedAt` as fallback when `latestEvalEndedAt` is absent
+
+**Behavior:**
+- Models without evals show "---" in all benchmark columns (already handled)
+- They appear in "N Most Recent" via `modelCreatedAt` fallback timestamp
+- Filter dropdowns automatically include them
+- Sorting by benchmark pushes them to bottom (undefined handling already exists)
+- "Top N Performers" naturally excludes them (no accuracy to rank by)
+- Duplicate model handling works via `modelDuplicateOf` field from models query
+
+---
+
+## February 1, 2026
 
 ### Enhancement: Merge-Then-Threshold Selection Logic
 

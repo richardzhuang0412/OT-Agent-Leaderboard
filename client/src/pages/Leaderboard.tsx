@@ -129,10 +129,15 @@ export default function Leaderboard() {
       return duplicatesOfSelected.some(dup => row.benchmarks[dup] !== undefined);
     });
 
-    // Filter: only rows with valid latestEvalEndedAt timestamp
-    const dataWithTimestamp = pivotedData.filter(row =>
-      row.latestEvalEndedAt && row.latestEvalEndedAt !== '—'
-    );
+    // Helper to get effective timestamp (latestEvalEndedAt or modelCreatedAt fallback)
+    const getEffectiveTimestamp = (row: PivotedLeaderboardRowWithImprovement): string | undefined =>
+      row.latestEvalEndedAt || row.modelCreatedAt;
+
+    // Filter: only rows with a valid timestamp (eval or creation time)
+    const dataWithTimestamp = pivotedData.filter(row => {
+      const ts = getEffectiveTimestamp(row);
+      return ts && ts !== '—';
+    });
 
     // Top N by selected benchmark accuracy (descending), with duplicate fallback
     const topPerformers = [...dataWithBenchmark]
@@ -143,11 +148,11 @@ export default function Leaderboard() {
       })
       .slice(0, topN === Number.MAX_SAFE_INTEGER ? undefined : topN);
 
-    // Recent N by latestEvalEndedAt timestamp (descending)
+    // Recent N by effective timestamp (descending) - uses modelCreatedAt as fallback
     const mostRecent = [...dataWithTimestamp]
       .sort((a, b) => {
-        const dateA = new Date(a.latestEvalEndedAt!).getTime();
-        const dateB = new Date(b.latestEvalEndedAt!).getTime();
+        const dateA = new Date(getEffectiveTimestamp(a)!).getTime();
+        const dateB = new Date(getEffectiveTimestamp(b)!).getTime();
         return dateB - dateA;
       })
       .slice(0, recentN === Number.MAX_SAFE_INTEGER ? undefined : recentN);
