@@ -1,6 +1,26 @@
 # Leaderboard Development Progress
 
-## Latest Update: February 1, 2026
+## Latest Update: February 9, 2026
+
+### Enhancement: Search Inside Filter Bar Dropdowns
+
+Added a search input at the top of each filter popover (Models, Agents, Base Models, Benchmark Columns) to allow users to quickly find items instead of scrolling through the full list.
+
+**What Changed:**
+- Each popover now has a compact search input with a Search icon and clear (X) button
+- Case-insensitive substring filtering narrows the checkbox list in real-time
+- "No matches found" empty state when no items match the search
+- Search text clears automatically when the popover closes
+- Auto-focuses on the search input when the popover opens (Radix default behavior)
+
+**File Modified:**
+- `client/src/components/FilterControlsWithBaseModel.tsx` — Added `useState` hooks for search state, filtered list derivations, search Input UI, and `onOpenChange` handlers
+
+**No changes needed elsewhere** — component props unchanged, all search state is local.
+
+---
+
+## Previous: February 1, 2026
 
 ### Enhancement: Merge-Then-Threshold Selection Logic
 
