@@ -1,6 +1,24 @@
 # Leaderboard Development Progress
 
-## Latest Update: February 1, 2026
+## Latest Update: February 9, 2026
+
+### Enhancement: Default Benchmarks & Column Reorder
+
+Added `dev_set_v2` to default visible benchmarks and reordered table columns so benchmark data appears before metadata.
+
+**What Changed:**
+1. **Default benchmarks:** Added `dev_set_v2` to `DEFAULT_VISIBLE_BENCHMARKS` array
+2. **Column order:** Moved benchmark columns to appear right after Agent Name, pushing Base Model and eval timestamps to the right end
+
+**New column order:** Model Name | Agent Name | [Benchmark columns...] | Base Model | First Eval Ended At | Latest Eval Ended At
+
+**Files Modified:**
+- `client/src/config/benchmarkConfig.ts` - Added `dev_set_v2` to defaults
+- `client/src/components/LeaderboardTableWithImprovement.tsx` - Reordered `<thead>` and `<tbody>` columns
+
+---
+
+## February 1, 2026
 
 ### Enhancement: Merge-Then-Threshold Selection Logic
 
