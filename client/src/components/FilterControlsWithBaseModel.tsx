@@ -1,6 +1,8 @@
-import { Filter, X } from 'lucide-react';
+import { useState } from 'react';
+import { Filter, Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
   Popover,
   PopoverContent,
@@ -40,6 +42,24 @@ export default function FilterControlsWithBaseModel({
   onBenchmarksChange,
   onClearAll,
 }: FilterControlsWithBaseModelProps) {
+  const [modelFilterSearch, setModelFilterSearch] = useState('');
+  const [agentFilterSearch, setAgentFilterSearch] = useState('');
+  const [baseModelFilterSearch, setBaseModelFilterSearch] = useState('');
+  const [benchmarkFilterSearch, setBenchmarkFilterSearch] = useState('');
+
+  const filteredModels = availableModels.filter((m) =>
+    m.toLowerCase().includes(modelFilterSearch.toLowerCase())
+  );
+  const filteredAgents = availableAgents.filter((a) =>
+    a.toLowerCase().includes(agentFilterSearch.toLowerCase())
+  );
+  const filteredBaseModels = availableBaseModels.filter((bm) =>
+    bm.toLowerCase().includes(baseModelFilterSearch.toLowerCase())
+  );
+  const filteredBenchmarks = availableBenchmarks.filter((b) =>
+    b.toLowerCase().includes(benchmarkFilterSearch.toLowerCase())
+  );
+
   const toggleModel = (model: string) => {
     if (selectedModels.includes(model)) {
       onModelsChange(selectedModels.filter((m) => m !== model));
@@ -77,7 +97,7 @@ export default function FilterControlsWithBaseModel({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <Popover>
+        <Popover onOpenChange={(open) => { if (!open) setModelFilterSearch(''); }}>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" data-testid="button-filter-models">
               <Filter className="w-4 h-4 mr-2" />
@@ -89,32 +109,53 @@ export default function FilterControlsWithBaseModel({
               )}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-64" align="start">
+          <PopoverContent className="w-64" align="start" avoidCollisions={false}>
             <div className="space-y-3">
               <h4 className="font-medium text-sm">Filter by Model</h4>
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Search models..."
+                  value={modelFilterSearch}
+                  onChange={(e) => setModelFilterSearch(e.target.value)}
+                  className="h-8 pl-8 pr-8 text-sm"
+                />
+                {modelFilterSearch && (
+                  <button
+                    onClick={() => setModelFilterSearch('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
               <div className="space-y-2 max-h-64 overflow-y-auto">
-                {availableModels.map((model) => (
-                  <div key={model} className="flex items-center gap-2">
-                    <Checkbox
-                      id={`model-${model}`}
-                      checked={selectedModels.includes(model)}
-                      onCheckedChange={() => toggleModel(model)}
-                      data-testid={`checkbox-model-${model}`}
-                    />
-                    <Label
-                      htmlFor={`model-${model}`}
-                      className="text-sm cursor-pointer flex-1"
-                    >
-                      {model}
-                    </Label>
-                  </div>
-                ))}
+                {filteredModels.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-2 text-center">No matches found</p>
+                ) : (
+                  filteredModels.map((model) => (
+                    <div key={model} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`model-${model}`}
+                        checked={selectedModels.includes(model)}
+                        onCheckedChange={() => toggleModel(model)}
+                        data-testid={`checkbox-model-${model}`}
+                      />
+                      <Label
+                        htmlFor={`model-${model}`}
+                        className="text-sm cursor-pointer flex-1"
+                      >
+                        {model}
+                      </Label>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </PopoverContent>
         </Popover>
 
-        <Popover>
+        <Popover onOpenChange={(open) => { if (!open) setAgentFilterSearch(''); }}>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" data-testid="button-filter-agents">
               <Filter className="w-4 h-4 mr-2" />
@@ -126,32 +167,53 @@ export default function FilterControlsWithBaseModel({
               )}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-64" align="start">
+          <PopoverContent className="w-64" align="start" avoidCollisions={false}>
             <div className="space-y-3">
               <h4 className="font-medium text-sm">Filter by Agent</h4>
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Search agents..."
+                  value={agentFilterSearch}
+                  onChange={(e) => setAgentFilterSearch(e.target.value)}
+                  className="h-8 pl-8 pr-8 text-sm"
+                />
+                {agentFilterSearch && (
+                  <button
+                    onClick={() => setAgentFilterSearch('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
               <div className="space-y-2 max-h-64 overflow-y-auto">
-                {availableAgents.map((agent) => (
-                  <div key={agent} className="flex items-center gap-2">
-                    <Checkbox
-                      id={`agent-${agent}`}
-                      checked={selectedAgents.includes(agent)}
-                      onCheckedChange={() => toggleAgent(agent)}
-                      data-testid={`checkbox-agent-${agent}`}
-                    />
-                    <Label
-                      htmlFor={`agent-${agent}`}
-                      className="text-sm cursor-pointer flex-1"
-                    >
-                      {agent}
-                    </Label>
-                  </div>
-                ))}
+                {filteredAgents.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-2 text-center">No matches found</p>
+                ) : (
+                  filteredAgents.map((agent) => (
+                    <div key={agent} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`agent-${agent}`}
+                        checked={selectedAgents.includes(agent)}
+                        onCheckedChange={() => toggleAgent(agent)}
+                        data-testid={`checkbox-agent-${agent}`}
+                      />
+                      <Label
+                        htmlFor={`agent-${agent}`}
+                        className="text-sm cursor-pointer flex-1"
+                      >
+                        {agent}
+                      </Label>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </PopoverContent>
         </Popover>
 
-        <Popover>
+        <Popover onOpenChange={(open) => { if (!open) setBaseModelFilterSearch(''); }}>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" data-testid="button-filter-basemodels">
               <Filter className="w-4 h-4 mr-2" />
@@ -163,32 +225,53 @@ export default function FilterControlsWithBaseModel({
               )}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-64" align="start">
+          <PopoverContent className="w-64" align="start" avoidCollisions={false}>
             <div className="space-y-3">
               <h4 className="font-medium text-sm">Filter by Base Model</h4>
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Search base models..."
+                  value={baseModelFilterSearch}
+                  onChange={(e) => setBaseModelFilterSearch(e.target.value)}
+                  className="h-8 pl-8 pr-8 text-sm"
+                />
+                {baseModelFilterSearch && (
+                  <button
+                    onClick={() => setBaseModelFilterSearch('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
               <div className="space-y-2 max-h-64 overflow-y-auto">
-                {availableBaseModels.map((baseModel) => (
-                  <div key={baseModel} className="flex items-center gap-2">
-                    <Checkbox
-                      id={`basemodel-${baseModel}`}
-                      checked={selectedBaseModels.includes(baseModel)}
-                      onCheckedChange={() => toggleBaseModel(baseModel)}
-                      data-testid={`checkbox-basemodel-${baseModel}`}
-                    />
-                    <Label
-                      htmlFor={`basemodel-${baseModel}`}
-                      className="text-sm cursor-pointer flex-1"
-                    >
-                      {baseModel}
-                    </Label>
-                  </div>
-                ))}
+                {filteredBaseModels.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-2 text-center">No matches found</p>
+                ) : (
+                  filteredBaseModels.map((baseModel) => (
+                    <div key={baseModel} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`basemodel-${baseModel}`}
+                        checked={selectedBaseModels.includes(baseModel)}
+                        onCheckedChange={() => toggleBaseModel(baseModel)}
+                        data-testid={`checkbox-basemodel-${baseModel}`}
+                      />
+                      <Label
+                        htmlFor={`basemodel-${baseModel}`}
+                        className="text-sm cursor-pointer flex-1"
+                      >
+                        {baseModel}
+                      </Label>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </PopoverContent>
         </Popover>
 
-        <Popover>
+        <Popover onOpenChange={(open) => { if (!open) setBenchmarkFilterSearch(''); }}>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" data-testid="button-filter-benchmarks">
               <Filter className="w-4 h-4 mr-2" />
@@ -200,26 +283,47 @@ export default function FilterControlsWithBaseModel({
               )}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-64" align="start">
+          <PopoverContent className="w-64" align="start" avoidCollisions={false}>
             <div className="space-y-3">
               <h4 className="font-medium text-sm">Show Benchmark Columns</h4>
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Search benchmarks..."
+                  value={benchmarkFilterSearch}
+                  onChange={(e) => setBenchmarkFilterSearch(e.target.value)}
+                  className="h-8 pl-8 pr-8 text-sm"
+                />
+                {benchmarkFilterSearch && (
+                  <button
+                    onClick={() => setBenchmarkFilterSearch('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
               <div className="space-y-2 max-h-64 overflow-y-auto">
-                {availableBenchmarks.map((benchmark) => (
-                  <div key={benchmark} className="flex items-center gap-2">
-                    <Checkbox
-                      id={`benchmark-${benchmark}`}
-                      checked={selectedBenchmarks.includes(benchmark)}
-                      onCheckedChange={() => toggleBenchmark(benchmark)}
-                      data-testid={`checkbox-benchmark-${benchmark}`}
-                    />
-                    <Label
-                      htmlFor={`benchmark-${benchmark}`}
-                      className="text-sm cursor-pointer flex-1"
-                    >
-                      {benchmark}
-                    </Label>
-                  </div>
-                ))}
+                {filteredBenchmarks.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-2 text-center">No matches found</p>
+                ) : (
+                  filteredBenchmarks.map((benchmark) => (
+                    <div key={benchmark} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`benchmark-${benchmark}`}
+                        checked={selectedBenchmarks.includes(benchmark)}
+                        onCheckedChange={() => toggleBenchmark(benchmark)}
+                        data-testid={`checkbox-benchmark-${benchmark}`}
+                      />
+                      <Label
+                        htmlFor={`benchmark-${benchmark}`}
+                        className="text-sm cursor-pointer flex-1"
+                      >
+                        {benchmark}
+                      </Label>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </PopoverContent>
