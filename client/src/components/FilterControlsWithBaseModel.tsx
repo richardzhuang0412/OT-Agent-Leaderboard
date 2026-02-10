@@ -109,7 +109,7 @@ export default function FilterControlsWithBaseModel({
               )}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-64" align="start">
+          <PopoverContent className="w-64" align="start" avoidCollisions={false}>
             <div className="space-y-3">
               <h4 className="font-medium text-sm">Filter by Model</h4>
               <div className="relative">
@@ -167,7 +167,7 @@ export default function FilterControlsWithBaseModel({
               )}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-64" align="start">
+          <PopoverContent className="w-64" align="start" avoidCollisions={false}>
             <div className="space-y-3">
               <h4 className="font-medium text-sm">Filter by Agent</h4>
               <div className="relative">
@@ -225,7 +225,7 @@ export default function FilterControlsWithBaseModel({
               )}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-64" align="start">
+          <PopoverContent className="w-64" align="start" avoidCollisions={false}>
             <div className="space-y-3">
               <h4 className="font-medium text-sm">Filter by Base Model</h4>
               <div className="relative">
@@ -283,7 +283,7 @@ export default function FilterControlsWithBaseModel({
               )}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-64" align="start">
+          <PopoverContent className="w-64" align="start" avoidCollisions={false}>
             <div className="space-y-3">
               <h4 className="font-medium text-sm">Show Benchmark Columns</h4>
               <div className="relative">
