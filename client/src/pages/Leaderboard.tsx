@@ -17,7 +17,8 @@ const EVAL_AGENT_NAMES = new Set(['terminus-2', 'openhands', 'mini-swe-agent']);
 export default function Leaderboard() {
   const [activeTab, setActiveTab] = useState<'filtered' | 'all'>('filtered');
   const [topN, setTopN] = useState<number>(50);
-  const [recentN, setRecentN] = useState<number>(50);
+  const [recentlyAddedN, setRecentlyAddedN] = useState<number>(50);
+  const [recentlyEvaledN, setRecentlyEvaledN] = useState<number>(50);
   const [topPerformerBenchmark, setTopPerformerBenchmark] = useState<string>('dev_set_71_tasks');
   const [modelSearch, setModelSearch] = useState('');
   const [agentSearch, setAgentSearch] = useState('');
@@ -147,16 +148,6 @@ export default function Leaderboard() {
       return duplicatesOfSelected.some(dup => row.benchmarks[dup] !== undefined);
     });
 
-    // Helper to get effective timestamp (latestEvalEndedAt or modelCreatedAt fallback)
-    const getEffectiveTimestamp = (row: PivotedLeaderboardRowWithImprovement): string | undefined =>
-      row.latestEvalEndedAt || row.modelCreatedAt;
-
-    // Filter: only rows with a valid timestamp (eval or creation time)
-    const dataWithTimestamp = pivotedData.filter(row => {
-      const ts = getEffectiveTimestamp(row);
-      return ts && ts !== '—';
-    });
-
     // Top N by selected benchmark accuracy (descending), with duplicate fallback
     const topPerformers = [...dataWithBenchmark]
       .sort((a, b) => {
@@ -166,26 +157,32 @@ export default function Leaderboard() {
       })
       .slice(0, topN === Number.MAX_SAFE_INTEGER ? undefined : topN);
 
-    // Recent N by effective timestamp (descending) - uses modelCreatedAt as fallback
-    const mostRecent = [...dataWithTimestamp]
-      .sort((a, b) => {
-        const dateA = new Date(getEffectiveTimestamp(a)!).getTime();
-        const dateB = new Date(getEffectiveTimestamp(b)!).getTime();
-        return dateB - dateA;
-      })
-      .slice(0, recentN === Number.MAX_SAFE_INTEGER ? undefined : recentN);
+    // N Most Recently Added — sort by modelCreatedAt only
+    const dataWithCreatedAt = pivotedData.filter(row => row.modelCreatedAt && row.modelCreatedAt !== '—');
+    const mostRecentlyAdded = [...dataWithCreatedAt]
+      .sort((a, b) => new Date(b.modelCreatedAt!).getTime() - new Date(a.modelCreatedAt!).getTime())
+      .slice(0, recentlyAddedN === Number.MAX_SAFE_INTEGER ? undefined : recentlyAddedN);
+
+    // N Most Recently Evaluated — sort by latestEvalEndedAt only (no fallback)
+    const dataWithEvalAt = pivotedData.filter(row => row.latestEvalEndedAt && row.latestEvalEndedAt !== '—');
+    const mostRecentlyEvaled = [...dataWithEvalAt]
+      .sort((a, b) => new Date(b.latestEvalEndedAt!).getTime() - new Date(a.latestEvalEndedAt!).getTime())
+      .slice(0, recentlyEvaledN === Number.MAX_SAFE_INTEGER ? undefined : recentlyEvaledN);
 
     // Union: Remove duplicates using Map
     const uniqueMap = new Map<string, PivotedLeaderboardRowWithImprovement>();
     topPerformers.forEach(row => {
       uniqueMap.set(`${row.modelName}|||${row.agentName}`, row);
     });
-    mostRecent.forEach(row => {
+    mostRecentlyAdded.forEach(row => {
+      uniqueMap.set(`${row.modelName}|||${row.agentName}`, row);
+    });
+    mostRecentlyEvaled.forEach(row => {
       uniqueMap.set(`${row.modelName}|||${row.agentName}`, row);
     });
 
     return Array.from(uniqueMap.values());
-  }, [pivotedData, activeTab, topN, recentN, topPerformerBenchmark, canonicalToDuplicatesMap]);
+  }, [pivotedData, activeTab, topN, recentlyAddedN, recentlyEvaledN, topPerformerBenchmark, canonicalToDuplicatesMap]);
 
   // Initialize selectedBenchmarks with defaults only on first data load
   const hasInitializedBenchmarks = useRef(false);
@@ -270,9 +267,11 @@ export default function Leaderboard() {
           <TabsContent value="filtered" className="space-y-6">
             <ViewModeControls
               topN={topN}
-              recentN={recentN}
+              recentlyAddedN={recentlyAddedN}
+              recentlyEvaledN={recentlyEvaledN}
               onTopNChange={setTopN}
-              onRecentNChange={setRecentN}
+              onRecentlyAddedNChange={setRecentlyAddedN}
+              onRecentlyEvaledNChange={setRecentlyEvaledN}
               currentCount={filteredByViewMode.length}
               availableBenchmarks={canonicalBenchmarks}
               topPerformerBenchmark={topPerformerBenchmark}

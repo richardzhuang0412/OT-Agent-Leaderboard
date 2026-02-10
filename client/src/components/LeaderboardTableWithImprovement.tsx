@@ -64,7 +64,7 @@ interface LeaderboardTableWithImprovementProps {
   showDuplicateModels: boolean;
 }
 
-type SortField = 'modelName' | 'agentName' | 'baseModelName' | 'firstEvalEndedAt' | 'latestEvalEndedAt' | string; // string for dynamic benchmark names
+type SortField = 'modelName' | 'agentName' | 'baseModelName' | 'modelCreatedAt' | 'firstEvalEndedAt' | 'latestEvalEndedAt' | string; // string for dynamic benchmark names
 type SortDirection = 'asc' | 'desc' | null;
 type SortMode = 'accuracy' | 'improvement';
 
@@ -325,6 +325,9 @@ export default function LeaderboardTableWithImprovement({
         } else if (sortField === 'baseModelName') {
           aVal = a.baseModelName;
           bVal = b.baseModelName;
+        } else if (sortField === 'modelCreatedAt') {
+          aVal = a.modelCreatedAt ? new Date(a.modelCreatedAt) : undefined;
+          bVal = b.modelCreatedAt ? new Date(b.modelCreatedAt) : undefined;
         } else if (sortField === 'firstEvalEndedAt') {
           aVal = a.firstEvalEndedAt ? new Date(a.firstEvalEndedAt) : undefined;
           bVal = b.firstEvalEndedAt ? new Date(b.firstEvalEndedAt) : undefined;
@@ -499,7 +502,7 @@ export default function LeaderboardTableWithImprovement({
     );
   };
 
-  const totalColumns = 5 + visibleBenchmarks.length; // model + agent + base model + firstEvalEndedAt + latestEvalEndedAt + benchmark columns
+  const totalColumns = 6 + visibleBenchmarks.length; // model + agent + base model + modelCreatedAt + firstEvalEndedAt + latestEvalEndedAt + benchmark columns
 
   return (
     <>
@@ -596,6 +599,16 @@ export default function LeaderboardTableWithImprovement({
                 </th>
                 <th className="text-left px-6 py-4 min-w-[180px]">
                   <button
+                    onClick={() => handleSort('modelCreatedAt')}
+                    className="flex items-center gap-2 font-medium text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-2 px-2 py-1 rounded-md"
+                    data-testid="button-sort-modelCreatedAt"
+                  >
+                    Model Added At
+                    <SortIcon field="modelCreatedAt" />
+                  </button>
+                </th>
+                <th className="text-left px-6 py-4 min-w-[180px]">
+                  <button
                     onClick={() => handleSort('firstEvalEndedAt')}
                     className="flex items-center gap-2 font-medium text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-2 px-2 py-1 rounded-md"
                     data-testid="button-sort-firstEvalEndedAt"
@@ -656,6 +669,11 @@ export default function LeaderboardTableWithImprovement({
                       ))}
                     <td className="px-6 py-4">
                       <span className="text-muted-foreground">{row.baseModelName}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-muted-foreground font-mono text-sm">
+                        {row.modelCreatedAt || '—'}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-muted-foreground font-mono text-sm">
