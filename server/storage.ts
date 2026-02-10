@@ -134,57 +134,74 @@ export class DbStorage implements IStorage {
   }
 
   async getAllModels(): Promise<ModelInfo[]> {
-    // Query models joined with agents to get all registered models
-    const { data, error } = await supabase
+    // Two separate queries — PostgREST can't resolve models→agents FK
+    // due to unnamed constraint + multiple self-referencing FKs on models table
+    const { data: modelsData, error: modelsError } = await supabase
       .from('models')
-      .select('id, name, agent_id, base_model_id, duplicate_of, creation_time, agents!inner(id, name)');
+      .select('id, name, agent_id, base_model_id, duplicate_of, creation_time');
 
-    if (error) {
-      console.error('Error fetching models:', error);
-      throw error;
+    if (modelsError) {
+      console.error('Error fetching models:', modelsError);
+      throw modelsError;
     }
 
-    if (!data) {
+    if (!modelsData) {
       return [];
     }
 
-    // Build a map of model id -> model row for resolving self-references
+    const { data: agentsData, error: agentsError } = await supabase
+      .from('agents')
+      .select('id, name');
+
+    if (agentsError) {
+      console.error('Error fetching agents:', agentsError);
+      throw agentsError;
+    }
+
+    // Build agent lookup map: agent_id -> agent_name
+    const agentMap = new Map<string, string>();
+    for (const agent of (agentsData || [])) {
+      agentMap.set(agent.id, agent.name);
+    }
+
+    // Build model lookup map for resolving self-references (base_model_id, duplicate_of)
     const modelMap = new Map<string, any>();
-    for (const row of data) {
+    for (const row of modelsData) {
       modelMap.set(row.id, row);
     }
 
-    return data.map(row => {
-      // Resolve base model name from base_model_id
-      const baseModel = row.base_model_id ? modelMap.get(row.base_model_id) : null;
-      const baseModelName = baseModel ? baseModel.name : 'None';
+    return modelsData
+      .filter(row => agentMap.has(row.agent_id))
+      .map(row => {
+        const agentName = agentMap.get(row.agent_id)!;
 
-      // Resolve canonical model name from duplicate_of
-      const canonicalModel = row.duplicate_of ? modelMap.get(row.duplicate_of) : null;
-      const canonicalModelName = canonicalModel ? canonicalModel.name : row.name;
+        // Resolve base model name from base_model_id
+        const baseModel = row.base_model_id ? modelMap.get(row.base_model_id) : null;
+        const baseModelName = baseModel ? baseModel.name : 'None';
 
-      // Resolve base model's duplicate_of
-      const baseModelDuplicateOf = baseModel ? (baseModel.duplicate_of ?? null) : null;
-      const canonicalBaseModel = baseModelDuplicateOf ? modelMap.get(baseModelDuplicateOf) : null;
-      const canonicalBaseModelName = canonicalBaseModel ? canonicalBaseModel.name : baseModelName;
+        // Resolve canonical model name from duplicate_of
+        const canonicalModel = row.duplicate_of ? modelMap.get(row.duplicate_of) : null;
+        const canonicalModelName = canonicalModel ? canonicalModel.name : row.name;
 
-      // Handle agents join result - Supabase returns as object for !inner join
-      const agent = row.agents as unknown as { id: string; name: string };
+        // Resolve base model's duplicate_of
+        const baseModelDuplicateOf = baseModel ? (baseModel.duplicate_of ?? null) : null;
+        const canonicalBaseModel = baseModelDuplicateOf ? modelMap.get(baseModelDuplicateOf) : null;
+        const canonicalBaseModelName = canonicalBaseModel ? canonicalBaseModel.name : baseModelName;
 
-      return {
-        modelId: row.id,
-        modelName: row.name,
-        agentId: agent.id,
-        agentName: agent.name,
-        baseModelId: row.base_model_id ?? null,
-        baseModelName,
-        modelDuplicateOf: row.duplicate_of ?? null,
-        canonicalModelName,
-        baseModelDuplicateOf,
-        canonicalBaseModelName,
-        creationTime: row.creation_time ?? null,
-      };
-    });
+        return {
+          modelId: row.id,
+          modelName: row.name,
+          agentId: row.agent_id,
+          agentName,
+          baseModelId: row.base_model_id ?? null,
+          baseModelName,
+          modelDuplicateOf: row.duplicate_of ?? null,
+          canonicalModelName,
+          baseModelDuplicateOf,
+          canonicalBaseModelName,
+          creationTime: row.creation_time ?? null,
+        };
+      });
   }
 
   async getBenchmarkResult(id: string): Promise<BenchmarkResult | undefined> {

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { RefreshCw, Info, ExternalLink, AlertCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,8 @@ import ViewModeControls from '@/components/ViewModeControls';
 import ThemeToggle from '@/components/ThemeToggle';
 import { DEFAULT_VISIBLE_BENCHMARKS } from '@/config/benchmarkConfig';
 
+const EVAL_AGENT_NAMES = new Set(['terminus-2', 'openhands', 'mini-swe-agent']);
+
 export default function Leaderboard() {
   const [activeTab, setActiveTab] = useState<'filtered' | 'all'>('filtered');
   const [topN, setTopN] = useState<number>(50);
@@ -23,6 +25,7 @@ export default function Leaderboard() {
   const [benchmarkSearch, setBenchmarkSearch] = useState('');
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
+  const [selectedTrainingAgents, setSelectedTrainingAgents] = useState<string[]>([]);
   const [selectedBaseModels, setSelectedBaseModels] = useState<string[]>([]);
   const [selectedBenchmarks, setSelectedBenchmarks] = useState<string[]>([]);
   // Duplicate display controls (default: hide duplicates)
@@ -44,6 +47,22 @@ export default function Leaderboard() {
 
   const availableAgents = useMemo(() => {
     return Array.from(new Set(pivotedData.map((item) => item.agentName))).sort();
+  }, [pivotedData]);
+
+  const availableEvalAgents = useMemo(() => {
+    // Only known eval agents that actually appear in the data
+    const allAgents = new Set(pivotedData.map(item => item.agentName));
+    return Array.from(EVAL_AGENT_NAMES).filter(a => allAgents.has(a)).sort();
+  }, [pivotedData]);
+
+  const availableTrainingAgents = useMemo(() => {
+    // All agents from data that are NOT known eval agents (union of agentName and trainingAgentName)
+    const trainingSet = new Set<string>();
+    pivotedData.forEach(item => {
+      if (!EVAL_AGENT_NAMES.has(item.agentName)) trainingSet.add(item.agentName);
+      if (!EVAL_AGENT_NAMES.has(item.trainingAgentName)) trainingSet.add(item.trainingAgentName);
+    });
+    return Array.from(trainingSet).sort();
   }, [pivotedData]);
 
   const availableBaseModels = useMemo(() => {
@@ -169,10 +188,11 @@ export default function Leaderboard() {
     return Array.from(uniqueMap.values());
   }, [pivotedData, activeTab, topN, recentN, topPerformerBenchmark, canonicalToDuplicatesMap]);
 
-  // Initialize selectedBenchmarks with defaults when data first loads
+  // Initialize selectedBenchmarks with defaults only on first data load
+  const hasInitializedBenchmarks = useRef(false);
   useEffect(() => {
-    if (pivotedData.length > 0 && selectedBenchmarks.length === 0) {
-      // Filter defaults to only include benchmarks that exist in the data
+    if (pivotedData.length > 0 && !hasInitializedBenchmarks.current) {
+      hasInitializedBenchmarks.current = true;
       const validDefaults = DEFAULT_VISIBLE_BENCHMARKS.filter(benchmark =>
         availableBenchmarks.includes(benchmark)
       );
@@ -180,13 +200,21 @@ export default function Leaderboard() {
         setSelectedBenchmarks(validDefaults);
       }
     }
-  }, [pivotedData, availableBenchmarks, selectedBenchmarks.length]);
+  }, [pivotedData, availableBenchmarks]);
 
   const handleClearFilters = () => {
     setSelectedModels([]);
     setSelectedAgents([]);
+    setSelectedTrainingAgents([]);
     setSelectedBaseModels([]);
-    // Reset benchmarks to defaults instead of clearing
+    setSelectedBenchmarks([]);
+  };
+
+  const handleResetFilters = () => {
+    setSelectedModels([]);
+    setSelectedAgents([]);
+    setSelectedTrainingAgents([]);
+    setSelectedBaseModels([]);
     const validDefaults = DEFAULT_VISIBLE_BENCHMARKS.filter(benchmark =>
       availableBenchmarks.includes(benchmark)
     );
@@ -268,17 +296,22 @@ export default function Leaderboard() {
             <FilterControlsWithBaseModel
               availableModels={availableModels}
               availableAgents={availableAgents}
+              availableEvalAgents={availableEvalAgents}
+              availableTrainingAgents={availableTrainingAgents}
               availableBaseModels={availableBaseModels}
               availableBenchmarks={availableBenchmarks}
               selectedModels={selectedModels}
               selectedAgents={selectedAgents}
+              selectedTrainingAgents={selectedTrainingAgents}
               selectedBaseModels={selectedBaseModels}
               selectedBenchmarks={selectedBenchmarks}
               onModelsChange={setSelectedModels}
               onAgentsChange={setSelectedAgents}
+              onTrainingAgentsChange={setSelectedTrainingAgents}
               onBaseModelsChange={setSelectedBaseModels}
               onBenchmarksChange={setSelectedBenchmarks}
               onClearAll={handleClearFilters}
+              onReset={handleResetFilters}
             />
 
             {/* Duplicate Display Controls */}
@@ -422,6 +455,7 @@ export default function Leaderboard() {
               filters={{
                 models: selectedModels,
                 agents: selectedAgents,
+                trainingAgents: selectedTrainingAgents,
                 baseModels: selectedBaseModels,
                 benchmarks: selectedBenchmarks,
               }}
@@ -447,17 +481,22 @@ export default function Leaderboard() {
               <FilterControlsWithBaseModel
                 availableModels={availableModels}
                 availableAgents={availableAgents}
+                availableEvalAgents={availableEvalAgents}
+                availableTrainingAgents={availableTrainingAgents}
                 availableBaseModels={availableBaseModels}
                 availableBenchmarks={availableBenchmarks}
                 selectedModels={selectedModels}
                 selectedAgents={selectedAgents}
+                selectedTrainingAgents={selectedTrainingAgents}
                 selectedBaseModels={selectedBaseModels}
                 selectedBenchmarks={selectedBenchmarks}
                 onModelsChange={setSelectedModels}
                 onAgentsChange={setSelectedAgents}
+                onTrainingAgentsChange={setSelectedTrainingAgents}
                 onBaseModelsChange={setSelectedBaseModels}
                 onBenchmarksChange={setSelectedBenchmarks}
                 onClearAll={handleClearFilters}
+                onReset={handleResetFilters}
               />
 
               {/* Duplicate Display Controls */}
@@ -600,6 +639,7 @@ export default function Leaderboard() {
               filters={{
                 models: selectedModels,
                 agents: selectedAgents,
+                trainingAgents: selectedTrainingAgents,
                 baseModels: selectedBaseModels,
                 benchmarks: selectedBenchmarks,
               }}

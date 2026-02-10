@@ -16,6 +16,8 @@ const scrollbarHidingStyles = `
 export interface PivotedLeaderboardRowWithImprovement {
   modelName: string;
   agentName: string;
+  trainingAgentName: string;
+  isNoEval: boolean;
   firstEvalEndedAt?: string;
   latestEvalEndedAt?: string;
   modelCreatedAt?: string;
@@ -53,6 +55,7 @@ interface LeaderboardTableWithImprovementProps {
   filters: {
     models: string[];
     agents: string[];
+    trainingAgents: string[];
     baseModels: string[];
     benchmarks: string[];
   };
@@ -269,10 +272,13 @@ export default function LeaderboardTableWithImprovement({
       filtered = filtered.filter(row => row.modelName.toLowerCase().includes(query));
     }
 
-    // Filter by agent search
+    // Filter by agent search (matches both eval agent and training agent)
     if (agentSearch) {
       const query = agentSearch.toLowerCase();
-      filtered = filtered.filter(row => row.agentName.toLowerCase().includes(query));
+      filtered = filtered.filter(row =>
+        row.agentName.toLowerCase().includes(query) ||
+        row.trainingAgentName.toLowerCase().includes(query)
+      );
     }
 
     // Filter by base model search
@@ -289,6 +295,14 @@ export default function LeaderboardTableWithImprovement({
     // Filter by agent filters
     if (filters.agents.length > 0) {
       filtered = filtered.filter(row => filters.agents.includes(row.agentName));
+    }
+
+    // Filter by training agent filters (check both trainingAgentName and agentName)
+    if (filters.trainingAgents.length > 0) {
+      filtered = filtered.filter(row =>
+        filters.trainingAgents.includes(row.trainingAgentName) ||
+        filters.trainingAgents.includes(row.agentName)
+      );
     }
 
     // Filter by base model filters
@@ -629,7 +643,11 @@ export default function LeaderboardTableWithImprovement({
                         <span className="font-semibold text-foreground">{row.modelName}</span>
                       </td>
                     <td className="px-6 py-4">
-                      <span className="text-muted-foreground">{row.agentName}</span>
+                      {row.isNoEval ? (
+                        <span className="text-red-500 font-semibold">NO EVAL</span>
+                      ) : (
+                        <span className="text-muted-foreground">{row.agentName}</span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-muted-foreground">{row.baseModelName}</span>
