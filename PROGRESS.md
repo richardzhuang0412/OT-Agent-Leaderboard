@@ -2,6 +2,40 @@
 
 ## Latest Update: February 9, 2026
 
+### Feature: Training-time vs Eval-time Agent Display + Filter Clear Buttons
+
+Fixed duplicate row problem and added filter UX improvements.
+
+**Problem:**
+1. Every model got a row for its training-time agent AND for each eval-time agent, creating bloated duplicates
+2. Filter popups had no in-popup clear button
+
+**Solution:**
+- Models with evals: only show eval-agent rows (no training-agent duplicates)
+- Models without evals: show ONE "NO EVAL" row in red
+- Added `trainingAgentName` field for filtering by training agent separately
+- Agent filter dropdown split into "Eval Agents" and "Training Agents" sections
+- Clear button added to all 4 filter popups
+
+**Files Modified:**
+- `server/routes.ts` - Rewrote merge logic: backfills `trainingAgentName` from models table, `isNoEval` flag, single NO EVAL row per model
+- `client/src/components/LeaderboardTableWithImprovement.tsx` - Added `trainingAgentName`/`isNoEval` to interface, red NO EVAL display, agent search matches both agents, training agent filter
+- `client/src/components/FilterControlsWithBaseModel.tsx` - Two-section agent dropdown, clear buttons in all popups, training agent badges
+- `client/src/pages/Leaderboard.tsx` - `selectedTrainingAgents` state, derived `availableEvalAgents`/`availableTrainingAgents`, updated props
+
+---
+
+### Previous: Show Models Without Evaluations on the Leaderboard
+
+Models registered in the database but without evaluation results (`sandbox_jobs`) now appear on the leaderboard with "---" in all benchmark columns.
+
+**Approach:** Separate query for all models from the `models` table, merged server-side into the existing pivoted response. No SQL view changes needed.
+
+**Files Modified:**
+- `server/storage.ts` - Added `ModelInfo` interface and `getAllModels()` method (queries `models` with `INNER JOIN agents`, resolves `base_model_id`/`duplicate_of` self-references in memory)
+- `server/routes.ts` - In `/api/leaderboard-pivoted-with-improvement`: fetches all models, adds `modelCreatedAt` to all entries, creates new entries for models without evals (empty benchmarks)
+- `client/src/components/LeaderboardTableWithImprovement.tsx` - Added `modelCreatedAt?: string` to `PivotedLeaderboardRowWithImprovement` interface
+- `client/src/pages/Leaderboard.tsx` - "N Most Recent" uses `modelCreatedAt` as fallback when `latestEvalEndedAt` is absent
 ### Enhancement: Search Inside Filter Bar Dropdowns
 
 Added a search input at the top of each filter popover (Models, Agents, Base Models, Benchmark Columns) to allow users to quickly find items instead of scrolling through the full list.

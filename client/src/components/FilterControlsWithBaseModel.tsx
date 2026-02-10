@@ -14,33 +14,43 @@ import { Label } from '@/components/ui/label';
 interface FilterControlsWithBaseModelProps {
   availableModels: string[];
   availableAgents: string[];
+  availableEvalAgents: string[];
+  availableTrainingAgents: string[];
   availableBaseModels: string[];
   availableBenchmarks: string[];
   selectedModels: string[];
   selectedAgents: string[];
+  selectedTrainingAgents: string[];
   selectedBaseModels: string[];
   selectedBenchmarks: string[];
   onModelsChange: (models: string[]) => void;
   onAgentsChange: (agents: string[]) => void;
+  onTrainingAgentsChange: (agents: string[]) => void;
   onBaseModelsChange: (baseModels: string[]) => void;
   onBenchmarksChange: (benchmarks: string[]) => void;
   onClearAll: () => void;
+  onReset: () => void;
 }
 
 export default function FilterControlsWithBaseModel({
   availableModels,
   availableAgents,
+  availableEvalAgents,
+  availableTrainingAgents,
   availableBaseModels,
   availableBenchmarks,
   selectedModels,
   selectedAgents,
+  selectedTrainingAgents,
   selectedBaseModels,
   selectedBenchmarks,
   onModelsChange,
   onAgentsChange,
+  onTrainingAgentsChange,
   onBaseModelsChange,
   onBenchmarksChange,
   onClearAll,
+  onReset,
 }: FilterControlsWithBaseModelProps) {
   const [modelFilterSearch, setModelFilterSearch] = useState('');
   const [agentFilterSearch, setAgentFilterSearch] = useState('');
@@ -50,7 +60,10 @@ export default function FilterControlsWithBaseModel({
   const filteredModels = availableModels.filter((m) =>
     m.toLowerCase().includes(modelFilterSearch.toLowerCase())
   );
-  const filteredAgents = availableAgents.filter((a) =>
+  const filteredEvalAgents = availableEvalAgents.filter((a) =>
+    a.toLowerCase().includes(agentFilterSearch.toLowerCase())
+  );
+  const filteredTrainingAgents = availableTrainingAgents.filter((a) =>
     a.toLowerCase().includes(agentFilterSearch.toLowerCase())
   );
   const filteredBaseModels = availableBaseModels.filter((bm) =>
@@ -76,6 +89,14 @@ export default function FilterControlsWithBaseModel({
     }
   };
 
+  const toggleTrainingAgent = (agent: string) => {
+    if (selectedTrainingAgents.includes(agent)) {
+      onTrainingAgentsChange(selectedTrainingAgents.filter((a) => a !== agent));
+    } else {
+      onTrainingAgentsChange([...selectedTrainingAgents, agent]);
+    }
+  };
+
   const toggleBaseModel = (baseModel: string) => {
     if (selectedBaseModels.includes(baseModel)) {
       onBaseModelsChange(selectedBaseModels.filter((bm) => bm !== baseModel));
@@ -92,7 +113,7 @@ export default function FilterControlsWithBaseModel({
     }
   };
 
-  const totalFilters = selectedModels.length + selectedAgents.length + selectedBaseModels.length + selectedBenchmarks.length;
+  const totalFilters = selectedModels.length + selectedAgents.length + selectedTrainingAgents.length + selectedBaseModels.length + selectedBenchmarks.length;
 
   return (
     <div className="space-y-4">
@@ -111,7 +132,15 @@ export default function FilterControlsWithBaseModel({
           </PopoverTrigger>
           <PopoverContent className="w-64" align="start" avoidCollisions={false}>
             <div className="space-y-3">
-              <h4 className="font-medium text-sm">Filter by Model</h4>
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium text-sm">Filter by Model</h4>
+                <button
+                  onClick={() => onModelsChange([])}
+                  className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                >
+                  Clear
+                </button>
+              </div>
               <div className="relative">
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                 <Input
@@ -160,16 +189,24 @@ export default function FilterControlsWithBaseModel({
             <Button variant="outline" size="sm" data-testid="button-filter-agents">
               <Filter className="w-4 h-4 mr-2" />
               Agents
-              {selectedAgents.length > 0 && (
+              {(selectedAgents.length + selectedTrainingAgents.length) > 0 && (
                 <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-xs">
-                  {selectedAgents.length}
+                  {selectedAgents.length + selectedTrainingAgents.length}
                 </Badge>
               )}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-64" align="start" avoidCollisions={false}>
             <div className="space-y-3">
-              <h4 className="font-medium text-sm">Filter by Agent</h4>
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium text-sm">Filter by Agent</h4>
+                <button
+                  onClick={() => { onAgentsChange([]); onTrainingAgentsChange([]); }}
+                  className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                >
+                  Clear
+                </button>
+              </div>
               <div className="relative">
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                 <Input
@@ -188,19 +225,42 @@ export default function FilterControlsWithBaseModel({
                 )}
               </div>
               <div className="space-y-2 max-h-64 overflow-y-auto">
-                {filteredAgents.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-2 text-center">No matches found</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Eval Agents</p>
+                {filteredEvalAgents.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-1 text-center">No matches found</p>
                 ) : (
-                  filteredAgents.map((agent) => (
-                    <div key={agent} className="flex items-center gap-2">
+                  filteredEvalAgents.map((agent) => (
+                    <div key={`eval-${agent}`} className="flex items-center gap-2">
                       <Checkbox
-                        id={`agent-${agent}`}
+                        id={`eval-agent-${agent}`}
                         checked={selectedAgents.includes(agent)}
                         onCheckedChange={() => toggleAgent(agent)}
                         data-testid={`checkbox-agent-${agent}`}
                       />
                       <Label
-                        htmlFor={`agent-${agent}`}
+                        htmlFor={`eval-agent-${agent}`}
+                        className="text-sm cursor-pointer flex-1"
+                      >
+                        {agent}
+                      </Label>
+                    </div>
+                  ))
+                )}
+                <div className="border-t border-border my-2" />
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Training Agents</p>
+                {filteredTrainingAgents.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-1 text-center">No matches found</p>
+                ) : (
+                  filteredTrainingAgents.map((agent) => (
+                    <div key={`training-${agent}`} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`training-agent-${agent}`}
+                        checked={selectedTrainingAgents.includes(agent)}
+                        onCheckedChange={() => toggleTrainingAgent(agent)}
+                        data-testid={`checkbox-training-agent-${agent}`}
+                      />
+                      <Label
+                        htmlFor={`training-agent-${agent}`}
                         className="text-sm cursor-pointer flex-1"
                       >
                         {agent}
@@ -227,7 +287,15 @@ export default function FilterControlsWithBaseModel({
           </PopoverTrigger>
           <PopoverContent className="w-64" align="start" avoidCollisions={false}>
             <div className="space-y-3">
-              <h4 className="font-medium text-sm">Filter by Base Model</h4>
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium text-sm">Filter by Base Model</h4>
+                <button
+                  onClick={() => onBaseModelsChange([])}
+                  className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                >
+                  Clear
+                </button>
+              </div>
               <div className="relative">
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                 <Input
@@ -285,7 +353,15 @@ export default function FilterControlsWithBaseModel({
           </PopoverTrigger>
           <PopoverContent className="w-64" align="start" avoidCollisions={false}>
             <div className="space-y-3">
-              <h4 className="font-medium text-sm">Show Benchmark Columns</h4>
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium text-sm">Show Benchmark Columns</h4>
+                <button
+                  onClick={() => onBenchmarksChange([])}
+                  className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                >
+                  Clear
+                </button>
+              </div>
               <div className="relative">
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                 <Input
@@ -329,16 +405,24 @@ export default function FilterControlsWithBaseModel({
           </PopoverContent>
         </Popover>
 
-        {totalFilters > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClearAll}
-            data-testid="button-clear-filters"
-          >
-            Clear All
-          </Button>
-        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onReset}
+          className="text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950"
+          data-testid="button-reset-filters"
+        >
+          Reset to Defaults
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onClearAll}
+          className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950"
+          data-testid="button-clear-filters"
+        >
+          Clear All Filters
+        </Button>
       </div>
 
       {totalFilters > 0 && (
@@ -355,10 +439,21 @@ export default function FilterControlsWithBaseModel({
             </Badge>
           ))}
           {selectedAgents.map((agent) => (
-            <Badge key={agent} variant="secondary" className="gap-1" data-testid={`badge-filter-${agent}`}>
+            <Badge key={`eval-${agent}`} variant="secondary" className="gap-1" data-testid={`badge-filter-${agent}`}>
               {agent}
               <button
                 onClick={() => toggleAgent(agent)}
+                className="hover-elevate active-elevate-2 rounded-sm"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </Badge>
+          ))}
+          {selectedTrainingAgents.map((agent) => (
+            <Badge key={`training-${agent}`} variant="secondary" className="gap-1" data-testid={`badge-filter-training-${agent}`}>
+              {agent} (training)
+              <button
+                onClick={() => toggleTrainingAgent(agent)}
                 className="hover-elevate active-elevate-2 rounded-sm"
               >
                 <X className="w-3 h-3" />

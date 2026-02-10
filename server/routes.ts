@@ -122,10 +122,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const groupedData = new Map<string, {
         modelName: string;
         agentName: string;
+        trainingAgentName: string;
+        isNoEval: boolean;
         modelId: string;
         baseModelName: string;
         firstEvalEndedAt?: string;
         latestEvalEndedAt?: string;
+        modelCreatedAt?: string;
         // Duplicate tracking fields
         modelDuplicateOf: string | null;
         canonicalModelName: string;
@@ -156,6 +159,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           groupedData.set(key, {
             modelName: result.modelName,
             agentName: result.agentName,
+            trainingAgentName: result.agentName, // Will be backfilled from models table later
+            isNoEval: false,
             modelId: result.modelId,
             baseModelName: result.baseModelName,
             firstEvalEndedAt: result.endedAt,
@@ -199,6 +204,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sourceBenchmarkName: result.sourceBenchmarkName,
           sourceBenchmarkId: result.sourceBenchmarkId
         };
+      }
+
+      // Fetch all registered models to backfill training agent info and add NO EVAL rows
+      const allModels = await storage.getAllModels();
+
+      const formatTimestamp = (ts: string) => {
+        const d = new Date(ts);
+        return d.toISOString().split('T')[0] + ' ' + d.toTimeString().split(' ')[0];
+      };
+
+      // Build modelId → trainingAgentName and modelId → creationTime lookups
+      const modelTrainingAgentMap = new Map<string, string>();
+      const modelCreationTimeMap = new Map<string, string>();
+      for (const model of allModels) {
+        modelTrainingAgentMap.set(model.modelId, model.agentName);
+        if (model.creationTime) {
+          modelCreationTimeMap.set(model.modelId, model.creationTime);
+        }
+      }
+
+      // Backfill trainingAgentName + modelCreatedAt on existing eval-result rows
+      groupedData.forEach((group) => {
+        group.trainingAgentName = modelTrainingAgentMap.get(group.modelId) ?? group.agentName;
+        group.isNoEval = false;
+        const ct = modelCreationTimeMap.get(group.modelId);
+        if (ct) group.modelCreatedAt = formatTimestamp(ct);
+      });
+
+      // Collect model names that have ANY eval results
+      const modelNamesWithEvals = new Set<string>();
+      groupedData.forEach(group => modelNamesWithEvals.add(group.modelName));
+
+      // Add ONE "NO EVAL" row per model name that has zero eval results
+      const noEvalModelsAdded = new Set<string>();
+      for (const model of allModels) {
+        if (modelNamesWithEvals.has(model.modelName)) continue;
+        if (noEvalModelsAdded.has(model.modelName)) continue;
+        noEvalModelsAdded.add(model.modelName);
+
+        const key = `${model.modelName}|||NO EVAL`;
+        groupedData.set(key, {
+          modelName: model.modelName,
+          agentName: 'NO EVAL',
+          trainingAgentName: model.agentName,
+          isNoEval: true,
+          modelId: model.modelId,
+          baseModelName: model.baseModelName,
+          firstEvalEndedAt: undefined,
+          latestEvalEndedAt: undefined,
+          modelCreatedAt: model.creationTime ? formatTimestamp(model.creationTime) : undefined,
+          modelDuplicateOf: model.modelDuplicateOf,
+          canonicalModelName: model.canonicalModelName,
+          canonicalBaseModelName: model.canonicalBaseModelName,
+          benchmarks: {}
+        });
       }
 
       // Convert to array and sort by model name, then agent name

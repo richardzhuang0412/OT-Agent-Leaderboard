@@ -32,9 +32,24 @@ export interface BenchmarkResultWithImprovement extends BenchmarkResultExtended 
   sourceBenchmarkId: string;
 }
 
+export interface ModelInfo {
+  modelId: string;
+  modelName: string;
+  agentId: string;
+  agentName: string;
+  baseModelId: string | null;
+  baseModelName: string;
+  modelDuplicateOf: string | null;
+  canonicalModelName: string;
+  baseModelDuplicateOf: string | null;
+  canonicalBaseModelName: string;
+  creationTime: string | null;
+}
+
 export interface IStorage {
   getAllBenchmarkResults(): Promise<BenchmarkResultExtended[]>;
   getAllBenchmarkResultsWithImprovement(): Promise<BenchmarkResultWithImprovement[]>;
+  getAllModels(): Promise<ModelInfo[]>;
   getBenchmarkResult(id: string): Promise<BenchmarkResult | undefined>;
   createBenchmarkResult(result: InsertBenchmarkResult): Promise<BenchmarkResult>;
   deleteBenchmarkResult(id: string): Promise<void>;
@@ -116,6 +131,77 @@ export class DbStorage implements IStorage {
       sourceBenchmarkName: row.source_benchmark_name ?? row.benchmark_name,
       sourceBenchmarkId: row.source_benchmark_id ?? row.benchmark_id,
     }));
+  }
+
+  async getAllModels(): Promise<ModelInfo[]> {
+    // Two separate queries — PostgREST can't resolve models→agents FK
+    // due to unnamed constraint + multiple self-referencing FKs on models table
+    const { data: modelsData, error: modelsError } = await supabase
+      .from('models')
+      .select('id, name, agent_id, base_model_id, duplicate_of, creation_time');
+
+    if (modelsError) {
+      console.error('Error fetching models:', modelsError);
+      throw modelsError;
+    }
+
+    if (!modelsData) {
+      return [];
+    }
+
+    const { data: agentsData, error: agentsError } = await supabase
+      .from('agents')
+      .select('id, name');
+
+    if (agentsError) {
+      console.error('Error fetching agents:', agentsError);
+      throw agentsError;
+    }
+
+    // Build agent lookup map: agent_id -> agent_name
+    const agentMap = new Map<string, string>();
+    for (const agent of (agentsData || [])) {
+      agentMap.set(agent.id, agent.name);
+    }
+
+    // Build model lookup map for resolving self-references (base_model_id, duplicate_of)
+    const modelMap = new Map<string, any>();
+    for (const row of modelsData) {
+      modelMap.set(row.id, row);
+    }
+
+    return modelsData
+      .filter(row => agentMap.has(row.agent_id))
+      .map(row => {
+        const agentName = agentMap.get(row.agent_id)!;
+
+        // Resolve base model name from base_model_id
+        const baseModel = row.base_model_id ? modelMap.get(row.base_model_id) : null;
+        const baseModelName = baseModel ? baseModel.name : 'None';
+
+        // Resolve canonical model name from duplicate_of
+        const canonicalModel = row.duplicate_of ? modelMap.get(row.duplicate_of) : null;
+        const canonicalModelName = canonicalModel ? canonicalModel.name : row.name;
+
+        // Resolve base model's duplicate_of
+        const baseModelDuplicateOf = baseModel ? (baseModel.duplicate_of ?? null) : null;
+        const canonicalBaseModel = baseModelDuplicateOf ? modelMap.get(baseModelDuplicateOf) : null;
+        const canonicalBaseModelName = canonicalBaseModel ? canonicalBaseModel.name : baseModelName;
+
+        return {
+          modelId: row.id,
+          modelName: row.name,
+          agentId: row.agent_id,
+          agentName,
+          baseModelId: row.base_model_id ?? null,
+          baseModelName,
+          modelDuplicateOf: row.duplicate_of ?? null,
+          canonicalModelName,
+          baseModelDuplicateOf,
+          canonicalBaseModelName,
+          creationTime: row.creation_time ?? null,
+        };
+      });
   }
 
   async getBenchmarkResult(id: string): Promise<BenchmarkResult | undefined> {
