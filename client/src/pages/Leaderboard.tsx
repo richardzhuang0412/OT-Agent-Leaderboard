@@ -56,18 +56,17 @@ export default function Leaderboard() {
   }, [pivotedData]);
 
   const availableTrainingAgents = useMemo(() => {
-    // All agents from data that are NOT known eval agents (union of agentName and trainingAgentName)
     const trainingSet = new Set<string>();
     pivotedData.forEach(item => {
-      if (!EVAL_AGENT_NAMES.has(item.agentName)) trainingSet.add(item.agentName);
-      if (!EVAL_AGENT_NAMES.has(item.trainingAgentName)) trainingSet.add(item.trainingAgentName);
+      if (item.agentName && !EVAL_AGENT_NAMES.has(item.agentName)) trainingSet.add(item.agentName);
+      if (item.trainingAgentName && !EVAL_AGENT_NAMES.has(item.trainingAgentName)) trainingSet.add(item.trainingAgentName);
     });
     return Array.from(trainingSet).sort();
   }, [pivotedData]);
 
   const availableBaseModels = useMemo(() => {
     return Array.from(new Set(
-      pivotedData.map((item) => item.baseModelName)
+      pivotedData.map((item) => item.baseModelName).filter(Boolean)
     )).sort();
   }, [pivotedData]);
 

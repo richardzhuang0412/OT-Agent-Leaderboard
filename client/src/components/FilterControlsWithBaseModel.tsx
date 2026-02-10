@@ -58,19 +58,19 @@ export default function FilterControlsWithBaseModel({
   const [benchmarkFilterSearch, setBenchmarkFilterSearch] = useState('');
 
   const filteredModels = availableModels.filter((m) =>
-    m.toLowerCase().includes(modelFilterSearch.toLowerCase())
+    m && m.toLowerCase().includes(modelFilterSearch.toLowerCase())
   );
   const filteredEvalAgents = availableEvalAgents.filter((a) =>
-    a.toLowerCase().includes(agentFilterSearch.toLowerCase())
+    a && a.toLowerCase().includes(agentFilterSearch.toLowerCase())
   );
   const filteredTrainingAgents = availableTrainingAgents.filter((a) =>
-    a.toLowerCase().includes(agentFilterSearch.toLowerCase())
+    a && a.toLowerCase().includes(agentFilterSearch.toLowerCase())
   );
   const filteredBaseModels = availableBaseModels.filter((bm) =>
-    bm.toLowerCase().includes(baseModelFilterSearch.toLowerCase())
+    bm && bm.toLowerCase().includes(baseModelFilterSearch.toLowerCase())
   );
   const filteredBenchmarks = availableBenchmarks.filter((b) =>
-    b.toLowerCase().includes(benchmarkFilterSearch.toLowerCase())
+    b && b.toLowerCase().includes(benchmarkFilterSearch.toLowerCase())
   );
 
   const toggleModel = (model: string) => {
