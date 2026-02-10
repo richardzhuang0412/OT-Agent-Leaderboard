@@ -1,4 +1,4 @@
-import { Trophy, Clock } from 'lucide-react';
+import { Trophy, Clock, CalendarPlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
   Select,
@@ -10,9 +10,11 @@ import {
 
 interface ViewModeControlsProps {
   topN: number;
-  recentN: number;
+  recentlyAddedN: number;
+  recentlyEvaledN: number;
   onTopNChange: (value: number) => void;
-  onRecentNChange: (value: number) => void;
+  onRecentlyAddedNChange: (value: number) => void;
+  onRecentlyEvaledNChange: (value: number) => void;
   currentCount: number;
   availableBenchmarks: string[];
   topPerformerBenchmark: string;
@@ -32,9 +34,11 @@ const DISPLAY_OPTIONS = [
 
 export default function ViewModeControls({
   topN,
-  recentN,
+  recentlyAddedN,
+  recentlyEvaledN,
   onTopNChange,
-  onRecentNChange,
+  onRecentlyAddedNChange,
+  onRecentlyEvaledNChange,
   currentCount,
   availableBenchmarks,
   topPerformerBenchmark,
@@ -45,9 +49,14 @@ export default function ViewModeControls({
     onTopNChange(numValue);
   };
 
-  const handleRecentNChange = (value: string) => {
+  const handleRecentlyAddedNChange = (value: string) => {
     const numValue = value === 'all' ? Number.MAX_SAFE_INTEGER : parseInt(value, 10);
-    onRecentNChange(numValue);
+    onRecentlyAddedNChange(numValue);
+  };
+
+  const handleRecentlyEvaledNChange = (value: string) => {
+    const numValue = value === 'all' ? Number.MAX_SAFE_INTEGER : parseInt(value, 10);
+    onRecentlyEvaledNChange(numValue);
   };
 
   const getCurrentValueString = (num: number): string => {
@@ -98,17 +107,40 @@ export default function ViewModeControls({
             </Select>
           </div>
 
-          {/* N Most Recent Dropdown */}
+          {/* N Most Recently Added Dropdown */}
           <div className="flex items-center gap-3">
-            <Clock className="w-4 h-4 text-muted-foreground" />
-            <label htmlFor="recent-n-select" className="text-sm font-medium text-foreground">
-              N Most Recent:
+            <CalendarPlus className="w-4 h-4 text-muted-foreground" />
+            <label htmlFor="recently-added-n-select" className="text-sm font-medium text-foreground">
+              N Most Recently Added:
             </label>
             <Select
-              value={getCurrentValueString(recentN)}
-              onValueChange={handleRecentNChange}
+              value={getCurrentValueString(recentlyAddedN)}
+              onValueChange={handleRecentlyAddedNChange}
             >
-              <SelectTrigger id="recent-n-select" className="w-24">
+              <SelectTrigger id="recently-added-n-select" className="w-24">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DISPLAY_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* N Most Recently Eval'd Dropdown */}
+          <div className="flex items-center gap-3">
+            <Clock className="w-4 h-4 text-muted-foreground" />
+            <label htmlFor="recently-evaled-n-select" className="text-sm font-medium text-foreground">
+              N Most Recently Eval'd:
+            </label>
+            <Select
+              value={getCurrentValueString(recentlyEvaledN)}
+              onValueChange={handleRecentlyEvaledNChange}
+            >
+              <SelectTrigger id="recently-evaled-n-select" className="w-24">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
