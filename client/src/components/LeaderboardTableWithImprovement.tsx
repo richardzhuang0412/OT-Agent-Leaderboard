@@ -531,36 +531,6 @@ export default function LeaderboardTableWithImprovement({
                     <SortIcon field="agentName" />
                   </button>
                 </th>
-                <th className="text-left px-6 py-4 min-w-[200px]">
-                  <button
-                    onClick={() => handleSort('baseModelName')}
-                    className="flex items-center gap-2 font-medium text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-2 px-2 py-1 rounded-md"
-                    data-testid="button-sort-basemodel"
-                  >
-                    Base Model
-                    <SortIcon field="baseModelName" />
-                  </button>
-                </th>
-                <th className="text-left px-6 py-4 min-w-[180px]">
-                  <button
-                    onClick={() => handleSort('firstEvalEndedAt')}
-                    className="flex items-center gap-2 font-medium text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-2 px-2 py-1 rounded-md"
-                    data-testid="button-sort-firstEvalEndedAt"
-                  >
-                    First Eval Ended At
-                    <SortIcon field="firstEvalEndedAt" />
-                  </button>
-                </th>
-                <th className="text-left px-6 py-4 min-w-[180px]">
-                  <button
-                    onClick={() => handleSort('latestEvalEndedAt')}
-                    className="flex items-center gap-2 font-medium text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-2 px-2 py-1 rounded-md"
-                    data-testid="button-sort-latestEvalEndedAt"
-                  >
-                    Latest Eval Ended At
-                    <SortIcon field="latestEvalEndedAt" />
-                  </button>
-                </th>
                 {visibleBenchmarks.map(benchmark => (
                   <th key={benchmark} className="text-right px-6 py-4 min-w-[220px]">
                     <div className="flex flex-col items-end gap-2">
@@ -599,6 +569,36 @@ export default function LeaderboardTableWithImprovement({
                     </div>
                   </th>
                 ))}
+                <th className="text-left px-6 py-4 min-w-[200px]">
+                  <button
+                    onClick={() => handleSort('baseModelName')}
+                    className="flex items-center gap-2 font-medium text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-2 px-2 py-1 rounded-md"
+                    data-testid="button-sort-basemodel"
+                  >
+                    Base Model
+                    <SortIcon field="baseModelName" />
+                  </button>
+                </th>
+                <th className="text-left px-6 py-4 min-w-[180px]">
+                  <button
+                    onClick={() => handleSort('firstEvalEndedAt')}
+                    className="flex items-center gap-2 font-medium text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-2 px-2 py-1 rounded-md"
+                    data-testid="button-sort-firstEvalEndedAt"
+                  >
+                    First Eval Ended At
+                    <SortIcon field="firstEvalEndedAt" />
+                  </button>
+                </th>
+                <th className="text-left px-6 py-4 min-w-[180px]">
+                  <button
+                    onClick={() => handleSort('latestEvalEndedAt')}
+                    className="flex items-center gap-2 font-medium text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-2 px-2 py-1 rounded-md"
+                    data-testid="button-sort-latestEvalEndedAt"
+                  >
+                    Latest Eval Ended At
+                    <SortIcon field="latestEvalEndedAt" />
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -630,6 +630,11 @@ export default function LeaderboardTableWithImprovement({
                     <td className="px-6 py-4">
                       <span className="text-muted-foreground">{row.agentName}</span>
                     </td>
+                      {visibleBenchmarks.map(benchmark => (
+                        <td key={benchmark} className="px-6 py-4 text-right">
+                          {formatBenchmarkCell(row.benchmarks[benchmark], benchmark)}
+                        </td>
+                      ))}
                     <td className="px-6 py-4">
                       <span className="text-muted-foreground">{row.baseModelName}</span>
                     </td>
@@ -643,11 +648,6 @@ export default function LeaderboardTableWithImprovement({
                         {row.latestEvalEndedAt || '—'}
                       </span>
                     </td>
-                      {visibleBenchmarks.map(benchmark => (
-                        <td key={benchmark} className="px-6 py-4 text-right">
-                          {formatBenchmarkCell(row.benchmarks[benchmark], benchmark)}
-                        </td>
-                      ))}
                     </tr>
                   );
                 })
