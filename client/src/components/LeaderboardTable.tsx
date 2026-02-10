@@ -125,13 +125,13 @@ export default function LeaderboardTable({
     // Filter by model search
     if (modelSearch) {
       const query = modelSearch.toLowerCase();
-      filtered = filtered.filter(row => row.modelName.toLowerCase().includes(query));
+      filtered = filtered.filter(row => row.modelName?.toLowerCase().includes(query));
     }
 
     // Filter by agent search
     if (agentSearch) {
       const query = agentSearch.toLowerCase();
-      filtered = filtered.filter(row => row.agentName.toLowerCase().includes(query));
+      filtered = filtered.filter(row => row.agentName?.toLowerCase().includes(query));
     }
 
     // Filter by model filters

@@ -269,22 +269,22 @@ export default function LeaderboardTableWithImprovement({
     // Filter by model search
     if (modelSearch) {
       const query = modelSearch.toLowerCase();
-      filtered = filtered.filter(row => row.modelName.toLowerCase().includes(query));
+      filtered = filtered.filter(row => row.modelName?.toLowerCase().includes(query));
     }
 
     // Filter by agent search (matches both eval agent and training agent)
     if (agentSearch) {
       const query = agentSearch.toLowerCase();
       filtered = filtered.filter(row =>
-        row.agentName.toLowerCase().includes(query) ||
-        row.trainingAgentName.toLowerCase().includes(query)
+        row.agentName?.toLowerCase().includes(query) ||
+        row.trainingAgentName?.toLowerCase().includes(query)
       );
     }
 
     // Filter by base model search
     if (baseModelSearch) {
       const query = baseModelSearch.toLowerCase();
-      filtered = filtered.filter(row => row.baseModelName.toLowerCase().includes(query));
+      filtered = filtered.filter(row => row.baseModelName?.toLowerCase().includes(query));
     }
 
     // Filter by model filters
