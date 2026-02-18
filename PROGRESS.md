@@ -1,6 +1,16 @@
 # Leaderboard Development Progress
 
-## Latest Update: February 9, 2026
+## Latest Update: February 18, 2026
+
+### Change Default Benchmark & Move swe-agent to Eval Agent
+
+Two small config changes in `client/src/pages/Leaderboard.tsx`:
+1. Changed default "Top N Performers" sort-by benchmark from `dev_set_71_tasks` to `dev_set_v2`
+2. Added `swe-agent` to `EVAL_AGENT_NAMES` set so it appears under "Eval Agents" instead of "Training Agents"
+
+---
+
+## February 9, 2026
 
 ### Feature: Training-time vs Eval-time Agent Display + Filter Clear Buttons
 

@@ -12,14 +12,14 @@ import ViewModeControls from '@/components/ViewModeControls';
 import ThemeToggle from '@/components/ThemeToggle';
 import { DEFAULT_VISIBLE_BENCHMARKS } from '@/config/benchmarkConfig';
 
-const EVAL_AGENT_NAMES = new Set(['terminus-2', 'openhands', 'mini-swe-agent']);
+const EVAL_AGENT_NAMES = new Set(['terminus-2', 'openhands', 'mini-swe-agent', 'swe-agent']);
 
 export default function Leaderboard() {
   const [activeTab, setActiveTab] = useState<'filtered' | 'all'>('filtered');
   const [topN, setTopN] = useState<number>(50);
   const [recentlyAddedN, setRecentlyAddedN] = useState<number>(50);
   const [recentlyEvaledN, setRecentlyEvaledN] = useState<number>(50);
-  const [topPerformerBenchmark, setTopPerformerBenchmark] = useState<string>('dev_set_71_tasks');
+  const [topPerformerBenchmark, setTopPerformerBenchmark] = useState<string>('dev_set_v2');
   const [modelSearch, setModelSearch] = useState('');
   const [agentSearch, setAgentSearch] = useState('');
   const [baseModelSearch, setBaseModelSearch] = useState('');
