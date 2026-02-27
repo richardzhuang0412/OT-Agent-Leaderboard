@@ -23,6 +23,8 @@ export interface PivotedLeaderboardRowWithImprovement {
   modelCreatedAt?: string;
   modelId: string;
   baseModelName: string;
+  // Training type
+  trainingType?: string;
   // Duplicate tracking fields
   modelDuplicateOf: string | null;
   canonicalModelName: string;
@@ -43,6 +45,11 @@ export interface PivotedLeaderboardRowWithImprovement {
     // Source benchmark (tracks which actual benchmark the result came from)
     sourceBenchmarkName?: string;
     sourceBenchmarkId?: string;
+    // Eval config metadata
+    timeoutMultiplier?: number;
+    daytonaOverrideCpus?: number;
+    daytonaOverrideMemoryMb?: number;
+    daytonaOverrideStorageMb?: number;
   }>;
 }
 
@@ -64,7 +71,7 @@ interface LeaderboardTableWithImprovementProps {
   showDuplicateModels: boolean;
 }
 
-type SortField = 'modelName' | 'agentName' | 'baseModelName' | 'modelCreatedAt' | 'firstEvalEndedAt' | 'latestEvalEndedAt' | string; // string for dynamic benchmark names
+type SortField = 'modelName' | 'agentName' | 'baseModelName' | 'trainingType' | 'modelCreatedAt' | 'firstEvalEndedAt' | 'latestEvalEndedAt' | string; // string for dynamic benchmark names
 type SortDirection = 'asc' | 'desc' | null;
 type SortMode = 'accuracy' | 'improvement';
 
@@ -325,6 +332,9 @@ export default function LeaderboardTableWithImprovement({
         } else if (sortField === 'baseModelName') {
           aVal = a.baseModelName;
           bVal = b.baseModelName;
+        } else if (sortField === 'trainingType') {
+          aVal = a.trainingType || '';
+          bVal = b.trainingType || '';
         } else if (sortField === 'modelCreatedAt') {
           aVal = a.modelCreatedAt ? new Date(a.modelCreatedAt) : undefined;
           bVal = b.modelCreatedAt ? new Date(b.modelCreatedAt) : undefined;
@@ -448,6 +458,10 @@ export default function LeaderboardTableWithImprovement({
       hfTracesLink?: string;
       baseModelAccuracy?: number;
       improvement?: number;
+      timeoutMultiplier?: number;
+      daytonaOverrideCpus?: number;
+      daytonaOverrideMemoryMb?: number;
+      daytonaOverrideStorageMb?: number;
     },
     benchmarkName?: string
   ) => {
@@ -485,6 +499,24 @@ export default function LeaderboardTableWithImprovement({
             <ExternalLink className="w-3.5 h-3.5 text-muted-foreground/40" />
           </div>
         )}
+        {/* Config metadata badges — stacked vertically in the middle */}
+        <div className="flex flex-col gap-1 items-start">
+          <span className={`font-mono text-[10px] rounded-full px-2 py-0.5 border ${
+            benchmarkData.timeoutMultiplier != null
+              ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/25'
+              : 'bg-muted/50 text-muted-foreground/50 border-muted-foreground/20'
+          }`}>
+            T:{benchmarkData.timeoutMultiplier != null ? `${benchmarkData.timeoutMultiplier}x` : 'N/A'}
+          </span>
+          <span className={`font-mono text-[10px] rounded-full px-2 py-0.5 border ${
+            (benchmarkData.daytonaOverrideCpus != null || benchmarkData.daytonaOverrideMemoryMb != null || benchmarkData.daytonaOverrideStorageMb != null)
+              ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/25'
+              : 'bg-muted/50 text-muted-foreground/50 border-muted-foreground/20'
+          }`}>
+            D:{benchmarkData.daytonaOverrideCpus ?? '?'}/{benchmarkData.daytonaOverrideMemoryMb != null ? (benchmarkData.daytonaOverrideMemoryMb / 1024).toFixed(0) : '?'}/{benchmarkData.daytonaOverrideStorageMb != null ? (benchmarkData.daytonaOverrideStorageMb / 1024).toFixed(0) : '?'}
+          </span>
+        </div>
+        {/* Numbers column — right-aligned */}
         <div className="flex flex-col items-end gap-1">
           <span className={`font-mono font-semibold text-sm ${getAccuracyColor(benchmarkData.accuracy)}`}>
             {benchmarkData.accuracy.toFixed(1)}%
@@ -502,7 +534,7 @@ export default function LeaderboardTableWithImprovement({
     );
   };
 
-  const totalColumns = 6 + visibleBenchmarks.length; // model + agent + base model + modelCreatedAt + firstEvalEndedAt + latestEvalEndedAt + benchmark columns
+  const totalColumns = 7 + visibleBenchmarks.length; // model + agent + base model + trainingType + modelCreatedAt + firstEvalEndedAt + latestEvalEndedAt + benchmark columns
 
   return (
     <>
@@ -597,6 +629,16 @@ export default function LeaderboardTableWithImprovement({
                     <SortIcon field="baseModelName" />
                   </button>
                 </th>
+                <th className="text-left px-6 py-4 min-w-[120px]">
+                  <button
+                    onClick={() => handleSort('trainingType')}
+                    className="flex items-center gap-2 font-medium text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-2 px-2 py-1 rounded-md"
+                    data-testid="button-sort-trainingType"
+                  >
+                    Training Type
+                    <SortIcon field="trainingType" />
+                  </button>
+                </th>
                 <th className="text-left px-6 py-4 min-w-[180px]">
                   <button
                     onClick={() => handleSort('modelCreatedAt')}
@@ -669,6 +711,9 @@ export default function LeaderboardTableWithImprovement({
                       ))}
                     <td className="px-6 py-4">
                       <span className="text-muted-foreground">{row.baseModelName}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-muted-foreground">{row.trainingType || '—'}</span>
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-muted-foreground font-mono text-sm">

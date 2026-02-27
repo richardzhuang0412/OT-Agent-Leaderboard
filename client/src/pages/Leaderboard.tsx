@@ -1,10 +1,11 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { RefreshCw, Info, ExternalLink, AlertCircle } from 'lucide-react';
+import { RefreshCw, Info, ExternalLink, AlertCircle, Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import LeaderboardTableWithImprovement, { type PivotedLeaderboardRowWithImprovement } from '@/components/LeaderboardTableWithImprovement';
 import SearchBarWithBaseModel from '@/components/SearchBarWithBaseModel';
 import FilterControlsWithBaseModel from '@/components/FilterControlsWithBaseModel';
@@ -12,9 +13,18 @@ import ViewModeControls from '@/components/ViewModeControls';
 import ThemeToggle from '@/components/ThemeToggle';
 import { DEFAULT_VISIBLE_BENCHMARKS } from '@/config/benchmarkConfig';
 
+type EvalSelectionMode = 'oldest' | 'latest' | 'highest';
+
+const SELECTION_MODE_DESCRIPTIONS: Record<EvalSelectionMode, string> = {
+  oldest: 'Shows the first valid evaluation (accuracy > 1%) per model/agent/benchmark, falling back to the earliest if none meet the threshold.',
+  latest: 'Shows the most recent valid evaluation (accuracy > 1%) per model/agent/benchmark, falling back to the latest if none meet the threshold.',
+  highest: 'Shows the highest accuracy evaluation per model/agent/benchmark.',
+};
+
 const EVAL_AGENT_NAMES = new Set(['terminus-2', 'openhands', 'mini-swe-agent', 'swe-agent']);
 
 export default function Leaderboard() {
+  const [selectionMode, setSelectionMode] = useState<EvalSelectionMode>('oldest');
   const [activeTab, setActiveTab] = useState<'filtered' | 'all'>('filtered');
   const [topN, setTopN] = useState<number>(50);
   const [recentlyAddedN, setRecentlyAddedN] = useState<number>(50);
@@ -33,9 +43,9 @@ export default function Leaderboard() {
   const [showDuplicateBenchmarks, setShowDuplicateBenchmarks] = useState(false);
   const [showDuplicateModels, setShowDuplicateModels] = useState(false);
 
-  // Always fetch improvement metrics data
-  const { data: pivotedData = [], isLoading, refetch } = useQuery<PivotedLeaderboardRowWithImprovement[]>({
-    queryKey: ['/api/leaderboard-pivoted-with-improvement'],
+  // Always fetch improvement metrics data (query key includes mode for per-mode caching)
+  const { data: pivotedData = [], isLoading, isFetching, refetch } = useQuery<PivotedLeaderboardRowWithImprovement[]>({
+    queryKey: [`/api/leaderboard-pivoted-with-improvement?mode=${selectionMode}`],
   });
 
   const handleRefresh = () => {
@@ -258,6 +268,28 @@ export default function Leaderboard() {
       </header>
 
       <main className="px-4 sm:px-6 lg:px-8 py-8">
+        {/* Eval Selection Mode */}
+        <div className="flex items-center gap-4 mb-6">
+          <span className="text-sm font-medium text-foreground">Result Selection:</span>
+          <ToggleGroup
+            type="single"
+            value={selectionMode}
+            onValueChange={(value) => { if (value) setSelectionMode(value as EvalSelectionMode); }}
+            variant="outline"
+            size="sm"
+          >
+            <ToggleGroupItem value="oldest">Oldest</ToggleGroupItem>
+            <ToggleGroupItem value="latest">Latest</ToggleGroupItem>
+            <ToggleGroupItem value="highest">Highest</ToggleGroupItem>
+          </ToggleGroup>
+          <span className="text-xs text-muted-foreground max-w-md">
+            {SELECTION_MODE_DESCRIPTIONS[selectionMode]}
+          </span>
+          {isFetching && !isLoading && (
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+          )}
+        </div>
+
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'filtered' | 'all')}>
           <TabsList>
             <TabsTrigger value="filtered">Filtered View</TabsTrigger>
@@ -429,14 +461,42 @@ export default function Leaderboard() {
               <div className="flex items-start gap-2">
                 <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-medium text-foreground">Result Selection</p>
+                  <p className="font-medium text-foreground">Result Selection ({selectionMode.charAt(0).toUpperCase() + selectionMode.slice(1)} mode)</p>
                   <p className="text-xs">
-                    For each model/agent/benchmark combination, results from equivalent benchmarks
-                    (canonical + duplicates) are merged into one pool. From this merged pool,
-                    the first evaluation with accuracy above 1% is displayed. If no evaluation
-                    meets this threshold, the earliest evaluation is shown instead. This ensures
-                    glitchy 0% runs are deprioritized while considering all equivalent benchmark results.
+                    {SELECTION_MODE_DESCRIPTIONS[selectionMode]}
+                    {' '}Results from equivalent benchmarks (canonical + duplicates) are merged into one pool before selection.
                   </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Config Metadata Badges */}
+            <div className="space-y-2">
+              <div className="flex items-start gap-2">
+                <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-foreground">Config Metadata Badges</p>
+                  <p className="text-xs">Each benchmark cell displays configuration badges indicating the evaluation environment settings.</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-4 text-xs ml-6">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[10px] rounded-full px-2 py-0.5 border bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/25">T:2x</span>
+                  <span>Timeout multiplier (e.g. 2x = double the default timeout)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[10px] rounded-full px-2 py-0.5 border bg-muted/50 text-muted-foreground/50 border-muted-foreground/20">T:N/A</span>
+                  <span>Default timeout (not configured / not found)</span>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-4 text-xs ml-6">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[10px] rounded-full px-2 py-0.5 border bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/25">D:4/8/32</span>
+                  <span>Daytona sandbox overrides: CPUs / Memory (GB) / Storage (GB)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[10px] rounded-full px-2 py-0.5 border bg-muted/50 text-muted-foreground/50 border-muted-foreground/20">D:?/?/?</span>
+                  <span>Default sandbox config (not configured / not found)</span>
                 </div>
               </div>
             </div>
@@ -614,14 +674,42 @@ export default function Leaderboard() {
                 <div className="flex items-start gap-2">
                   <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-medium text-foreground">Result Selection</p>
+                    <p className="font-medium text-foreground">Result Selection ({selectionMode.charAt(0).toUpperCase() + selectionMode.slice(1)} mode)</p>
                     <p className="text-xs">
-                      For each model/agent/benchmark combination, results from equivalent benchmarks
-                      (canonical + duplicates) are merged into one pool. From this merged pool,
-                      the first evaluation with accuracy above 1% is displayed. If no evaluation
-                      meets this threshold, the earliest evaluation is shown instead. This ensures
-                      glitchy 0% runs are deprioritized while considering all equivalent benchmark results.
+                      {SELECTION_MODE_DESCRIPTIONS[selectionMode]}
+                      {' '}Results from equivalent benchmarks (canonical + duplicates) are merged into one pool before selection.
                     </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Config Metadata Badges */}
+              <div className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-foreground">Config Metadata Badges</p>
+                    <p className="text-xs">Each benchmark cell displays configuration badges indicating the evaluation environment settings.</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-4 text-xs ml-6">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[10px] rounded-full px-2 py-0.5 border bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/25">T:2x</span>
+                    <span>Timeout multiplier (e.g. 2x = double the default timeout)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[10px] rounded-full px-2 py-0.5 border bg-muted/50 text-muted-foreground/50 border-muted-foreground/20">T:N/A</span>
+                    <span>Default timeout (not configured / not found)</span>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-4 text-xs ml-6">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[10px] rounded-full px-2 py-0.5 border bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/25">D:4/8/32</span>
+                    <span>Daytona sandbox overrides: CPUs / Memory (GB) / Storage (GB)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[10px] rounded-full px-2 py-0.5 border bg-muted/50 text-muted-foreground/50 border-muted-foreground/20">D:?/?/?</span>
+                    <span>Default sandbox config (not configured / not found)</span>
                   </div>
                 </div>
               </div>

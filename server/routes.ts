@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { storage, type EvalSelectionMode } from "./storage";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Get all benchmark results
@@ -88,7 +88,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get pivoted leaderboard data with improvement metrics
   app.get("/api/leaderboard-pivoted-with-improvement", async (req, res) => {
     try {
-      const results = await storage.getAllBenchmarkResultsWithImprovement();
+      // Validate and parse eval selection mode
+      const modeParam = req.query.mode as string | undefined;
+      const validModes: EvalSelectionMode[] = ['oldest', 'latest', 'highest'];
+      const mode: EvalSelectionMode = modeParam && validModes.includes(modeParam as EvalSelectionMode)
+        ? modeParam as EvalSelectionMode
+        : 'oldest';
+
+      const results = await storage.getAllBenchmarkResultsWithImprovement(mode);
 
       // Group by (model, agent) combination
       const groupedData = new Map<string, {
@@ -98,6 +105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isNoEval: boolean;
         modelId: string;
         baseModelName: string;
+        trainingType?: string;
         firstEvalEndedAt?: string;
         latestEvalEndedAt?: string;
         modelCreatedAt?: string;
@@ -121,6 +129,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Source benchmark (tracks which actual benchmark the result came from)
           sourceBenchmarkName: string;
           sourceBenchmarkId: string;
+          // Eval config metadata
+          timeoutMultiplier?: number;
+          daytonaOverrideCpus?: number;
+          daytonaOverrideMemoryMb?: number;
+          daytonaOverrideStorageMb?: number;
         }>;
       }>();
 
@@ -135,6 +148,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             isNoEval: false,
             modelId: result.modelId,
             baseModelName: result.baseModelName,
+            trainingType: result.trainingType,
             firstEvalEndedAt: result.endedAt,
             latestEvalEndedAt: result.endedAt,
             // Duplicate tracking fields
@@ -174,7 +188,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           canonicalBenchmarkName: result.canonicalBenchmarkName,
           // Source benchmark (tracks which actual benchmark the result came from)
           sourceBenchmarkName: result.sourceBenchmarkName,
-          sourceBenchmarkId: result.sourceBenchmarkId
+          sourceBenchmarkId: result.sourceBenchmarkId,
+          // Eval config metadata
+          timeoutMultiplier: result.timeoutMultiplier,
+          daytonaOverrideCpus: result.daytonaOverrideCpus,
+          daytonaOverrideMemoryMb: result.daytonaOverrideMemoryMb,
+          daytonaOverrideStorageMb: result.daytonaOverrideStorageMb
         };
       }
 
@@ -186,22 +205,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return d.toISOString().split('T')[0] + ' ' + d.toTimeString().split(' ')[0];
       };
 
-      // Build modelId → trainingAgentName and modelId → creationTime lookups
+      // Build modelId → trainingAgentName, modelId → creationTime, modelId → trainingType lookups
       const modelTrainingAgentMap = new Map<string, string>();
       const modelCreationTimeMap = new Map<string, string>();
+      const modelTrainingTypeMap = new Map<string, string>();
       for (const model of allModels) {
         modelTrainingAgentMap.set(model.modelId, model.agentName);
         if (model.creationTime) {
           modelCreationTimeMap.set(model.modelId, model.creationTime);
         }
+        if (model.trainingType) {
+          modelTrainingTypeMap.set(model.modelId, model.trainingType);
+        }
       }
 
-      // Backfill trainingAgentName + modelCreatedAt on existing eval-result rows
+      // Backfill trainingAgentName + modelCreatedAt + trainingType on existing eval-result rows
       groupedData.forEach((group) => {
         group.trainingAgentName = modelTrainingAgentMap.get(group.modelId) ?? group.agentName;
         group.isNoEval = false;
         const ct = modelCreationTimeMap.get(group.modelId);
         if (ct) group.modelCreatedAt = formatTimestamp(ct);
+        group.trainingType = modelTrainingTypeMap.get(group.modelId) ?? group.trainingType;
       });
 
       // Collect model names that have ANY eval results
@@ -223,6 +247,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           isNoEval: true,
           modelId: model.modelId,
           baseModelName: model.baseModelName,
+          trainingType: model.trainingType ?? undefined,
           firstEvalEndedAt: undefined,
           latestEvalEndedAt: undefined,
           modelCreatedAt: model.creationTime ? formatTimestamp(model.creationTime) : undefined,

@@ -3,6 +3,8 @@ import { supabase } from "@db";
 import { benchmarkResults } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
+export type EvalSelectionMode = 'oldest' | 'latest' | 'highest';
+
 export interface BenchmarkResultExtended extends BenchmarkResult {
   hfTracesLink?: string;
   endedAt?: string;
@@ -30,6 +32,13 @@ export interface BenchmarkResultWithImprovement extends BenchmarkResultExtended 
   // Source benchmark (tracks which actual benchmark the result came from after merging duplicates)
   sourceBenchmarkName: string;
   sourceBenchmarkId: string;
+  // Eval config metadata
+  timeoutMultiplier?: number;
+  daytonaOverrideCpus?: number;
+  daytonaOverrideMemoryMb?: number;
+  daytonaOverrideStorageMb?: number;
+  // Training type
+  trainingType?: string;
 }
 
 export interface ModelInfo {
@@ -44,11 +53,80 @@ export interface ModelInfo {
   baseModelDuplicateOf: string | null;
   canonicalBaseModelName: string;
   creationTime: string | null;
+  trainingType: string | null;
+}
+
+// Raw row from the leaderboard_results view (all results, no deduplication)
+interface RawLeaderboardRow {
+  id: string;
+  model_id: string;
+  model_name: string;
+  model_duplicate_of: string | null;
+  canonical_model_name: string;
+  base_model_id: string | null;
+  base_model_name: string;
+  base_model_duplicate_of: string | null;
+  canonical_base_model_name: string;
+  agent_name: string;
+  agent_id: string;
+  benchmark_name: string;
+  benchmark_id: string;
+  benchmark_duplicate_of: string | null;
+  canonical_benchmark_name: string;
+  source_benchmark_name: string;
+  source_benchmark_id: string;
+  accuracy: number | null;
+  standard_error: number | null;
+  hf_traces_link: string | null;
+  ended_at: string | null;
+  canonical_base_model_id: string | null;
+  config: any;
+  training_type: string | null;
+}
+
+/**
+ * Select one result from a pool of results based on the eval selection mode.
+ * - oldest: prefer accuracy > 1% → then earliest timestamp
+ * - latest: prefer accuracy > 1% → then latest timestamp
+ * - highest: highest accuracy (no threshold)
+ */
+function selectResult(pool: RawLeaderboardRow[], mode: EvalSelectionMode): RawLeaderboardRow | null {
+  if (pool.length === 0) return null;
+
+  if (mode === 'highest') {
+    // Simply pick the highest accuracy
+    let best = pool[0];
+    for (const row of pool) {
+      if ((row.accuracy ?? 0) > (best.accuracy ?? 0)) {
+        best = row;
+      }
+    }
+    return best;
+  }
+
+  // For oldest/latest: prefer results with accuracy > 1%, then sort by timestamp
+  const aboveThreshold = pool.filter(r => (r.accuracy ?? 0) > 1.0);
+  const candidates = aboveThreshold.length > 0 ? aboveThreshold : pool;
+
+  // Sort by timestamp
+  const sorted = [...candidates].sort((a, b) => {
+    const tsA = a.ended_at ? new Date(a.ended_at).getTime() : 0;
+    const tsB = b.ended_at ? new Date(b.ended_at).getTime() : 0;
+    return mode === 'oldest' ? tsA - tsB : tsB - tsA;
+  });
+
+  return sorted[0];
+}
+
+function formatTimestampField(ts: string | null): string | undefined {
+  if (!ts) return undefined;
+  const d = new Date(ts);
+  return d.toISOString().split('T')[0] + ' ' + d.toTimeString().split(' ')[0];
 }
 
 export interface IStorage {
   getAllBenchmarkResults(): Promise<BenchmarkResultExtended[]>;
-  getAllBenchmarkResultsWithImprovement(): Promise<BenchmarkResultWithImprovement[]>;
+  getAllBenchmarkResultsWithImprovement(mode?: EvalSelectionMode): Promise<BenchmarkResultWithImprovement[]>;
   getAllModels(): Promise<ModelInfo[]>;
   getBenchmarkResult(id: string): Promise<BenchmarkResult | undefined>;
   createBenchmarkResult(result: InsertBenchmarkResult): Promise<BenchmarkResult>;
@@ -56,10 +134,10 @@ export interface IStorage {
 }
 
 export class DbStorage implements IStorage {
-  async getAllBenchmarkResults(): Promise<BenchmarkResultExtended[]> {
-    // Query the leaderboard_results view
-    // This view aggregates data from sandbox_jobs, parsing metrics
-    // and deduplicating by (agent, model, benchmark) keeping the earliest valid job
+  /**
+   * Fetch all raw rows from the leaderboard_results view (no deduplication).
+   */
+  private async fetchAllRawRows(): Promise<RawLeaderboardRow[]> {
     const { data, error } = await supabase
       .from('leaderboard_results')
       .select('*');
@@ -69,68 +147,145 @@ export class DbStorage implements IStorage {
       throw error;
     }
 
-    if (!data) {
-      return [];
-    }
-
-    return data.map(row => ({
-      id: row.id,
-      modelName: row.model_name,
-      agentName: row.agent_name,
-      benchmarkName: row.benchmark_name,
-      accuracy: row.accuracy ?? 0,
-      standardError: row.standard_error ?? 0,
-      hfTracesLink: row.hf_traces_link,
-      endedAt: row.ended_at ? new Date(row.ended_at).toISOString().split('T')[0] + ' ' + new Date(row.ended_at).toTimeString().split(' ')[0] : undefined,
-    }));
+    return (data ?? []) as RawLeaderboardRow[];
   }
 
-  async getAllBenchmarkResultsWithImprovement(): Promise<BenchmarkResultWithImprovement[]> {
-    // Query the leaderboard_results view with improvement data
-    // Includes base model information for calculating improvements
-    const { data, error } = await supabase
-      .from('leaderboard_results')
-      .select('*');
+  /**
+   * Build an index grouping raw rows by (agentId, modelId, canonicalBenchmark).
+   */
+  private buildGroupIndex(rows: RawLeaderboardRow[]): Map<string, RawLeaderboardRow[]> {
+    const index = new Map<string, RawLeaderboardRow[]>();
+    for (const row of rows) {
+      const key = `${row.agent_id}|||${row.model_id}|||${row.benchmark_name}`;
+      const pool = index.get(key);
+      if (pool) {
+        pool.push(row);
+      } else {
+        index.set(key, [row]);
+      }
+    }
+    return index;
+  }
 
-    if (error) {
-      console.error('Error fetching leaderboard results with improvement:', error);
-      throw error;
+  async getAllBenchmarkResults(): Promise<BenchmarkResultExtended[]> {
+    const allRows = await this.fetchAllRawRows();
+    const index = this.buildGroupIndex(allRows);
+
+    const results: BenchmarkResultExtended[] = [];
+    for (const pool of Array.from(index.values())) {
+      const selected = selectResult(pool, 'oldest');
+      if (!selected) continue;
+
+      results.push({
+        id: selected.id,
+        modelName: selected.model_name,
+        agentName: selected.agent_name,
+        benchmarkName: selected.benchmark_name,
+        accuracy: selected.accuracy ?? 0,
+        standardError: selected.standard_error ?? 0,
+        hfTracesLink: selected.hf_traces_link ?? undefined,
+        endedAt: formatTimestampField(selected.ended_at),
+      });
     }
 
-    if (!data) {
-      return [];
+    return results;
+  }
+
+  async getAllBenchmarkResultsWithImprovement(mode: EvalSelectionMode = 'oldest'): Promise<BenchmarkResultWithImprovement[]> {
+    const allRows = await this.fetchAllRawRows();
+    const index = this.buildGroupIndex(allRows);
+
+    const results: BenchmarkResultWithImprovement[] = [];
+
+    for (const pool of Array.from(index.values())) {
+      const selected = selectResult(pool, mode);
+      if (!selected) continue;
+
+      // Compute the 4 base model accuracy values by looking up base model pools
+
+      // 1. base_model_accuracy: original base model on same canonical benchmark
+      const baseModelAccuracy = this.lookupBaseModelAccuracy(
+        index, selected.agent_id, selected.base_model_id, selected.benchmark_name, mode
+      );
+
+      // 2. canonical_benchmark_base_model_accuracy: same as base_model_accuracy
+      //    (with merged approach, canonical benchmark is already the key)
+      const canonicalBenchmarkBaseModelAccuracy = baseModelAccuracy;
+
+      // 3. canonical_base_model_accuracy: canonical base model on same benchmark
+      const canonicalBaseModelAccuracy = this.lookupBaseModelAccuracy(
+        index, selected.agent_id, selected.canonical_base_model_id, selected.benchmark_name, mode
+      );
+
+      // 4. canonical_both_base_model_accuracy: canonical base model on canonical benchmark
+      //    (same as #3 since benchmark_name is already canonical)
+      const canonicalBothBaseModelAccuracy = canonicalBaseModelAccuracy;
+
+      // Extract config fields
+      const config = selected.config;
+      const timeoutMultiplier = config?.timeout_multiplier ?? undefined;
+      const daytonaOverrideCpus = config?.environment?.override_cpus ?? undefined;
+      const daytonaOverrideMemoryMb = config?.environment?.override_memory_mb ?? undefined;
+      const daytonaOverrideStorageMb = config?.environment?.override_storage_mb ?? undefined;
+
+      results.push({
+        id: selected.id,
+        modelName: selected.model_name,
+        agentName: selected.agent_name,
+        benchmarkName: selected.benchmark_name,
+        accuracy: selected.accuracy ?? 0,
+        standardError: selected.standard_error ?? 0,
+        hfTracesLink: selected.hf_traces_link ?? undefined,
+        endedAt: formatTimestampField(selected.ended_at),
+        modelId: selected.model_id,
+        baseModelId: selected.base_model_id,
+        baseModelName: selected.base_model_name,
+        baseModelAccuracy,
+        canonicalBenchmarkBaseModelAccuracy,
+        canonicalBaseModelAccuracy,
+        canonicalBothBaseModelAccuracy,
+        agentId: selected.agent_id,
+        benchmarkId: selected.benchmark_id,
+        modelDuplicateOf: selected.model_duplicate_of ?? null,
+        canonicalModelName: selected.canonical_model_name ?? selected.model_name,
+        baseModelDuplicateOf: selected.base_model_duplicate_of ?? null,
+        canonicalBaseModelName: selected.canonical_base_model_name ?? selected.base_model_name,
+        benchmarkDuplicateOf: selected.benchmark_duplicate_of ?? null,
+        canonicalBenchmarkName: selected.canonical_benchmark_name ?? selected.benchmark_name,
+        sourceBenchmarkName: selected.source_benchmark_name ?? selected.benchmark_name,
+        sourceBenchmarkId: selected.source_benchmark_id ?? selected.benchmark_id,
+        timeoutMultiplier,
+        daytonaOverrideCpus,
+        daytonaOverrideMemoryMb,
+        daytonaOverrideStorageMb,
+        trainingType: selected.training_type ?? undefined,
+      });
     }
 
-    return data.map(row => ({
-      id: row.id,
-      modelName: row.model_name,
-      agentName: row.agent_name,
-      benchmarkName: row.benchmark_name,
-      accuracy: row.accuracy ?? 0,
-      standardError: row.standard_error ?? 0,
-      hfTracesLink: row.hf_traces_link,
-      endedAt: row.ended_at ? new Date(row.ended_at).toISOString().split('T')[0] + ' ' + new Date(row.ended_at).toTimeString().split(' ')[0] : undefined,
-      modelId: row.model_id,
-      baseModelId: row.base_model_id,
-      baseModelName: row.base_model_name,
-      baseModelAccuracy: row.base_model_accuracy ?? undefined,
-      // Additional accuracy values for duplicate-aware improvement calculation
-      canonicalBenchmarkBaseModelAccuracy: row.canonical_benchmark_base_model_accuracy ?? undefined,
-      canonicalBaseModelAccuracy: row.canonical_base_model_accuracy ?? undefined,
-      canonicalBothBaseModelAccuracy: row.canonical_both_base_model_accuracy ?? undefined,
-      agentId: row.agent_id,
-      benchmarkId: row.benchmark_id,
-      // Duplicate tracking fields
-      modelDuplicateOf: row.model_duplicate_of ?? null,
-      canonicalModelName: row.canonical_model_name ?? row.model_name,
-      baseModelDuplicateOf: row.base_model_duplicate_of ?? null,
-      canonicalBaseModelName: row.canonical_base_model_name ?? row.base_model_name,
-      benchmarkDuplicateOf: row.benchmark_duplicate_of ?? null,
-      canonicalBenchmarkName: row.canonical_benchmark_name ?? row.benchmark_name,
-      // Source benchmark (tracks which actual benchmark the result came from after merging duplicates)
-      sourceBenchmarkName: row.source_benchmark_name ?? row.benchmark_name,
-      sourceBenchmarkId: row.source_benchmark_id ?? row.benchmark_id,
-    }));
+    return results;
+  }
+
+  /**
+   * Look up base model accuracy by finding the base model's results for the same
+   * agent + canonical benchmark, then applying the same selection mode.
+   */
+  private lookupBaseModelAccuracy(
+    index: Map<string, RawLeaderboardRow[]>,
+    agentId: string,
+    baseModelId: string | null,
+    benchmarkName: string,
+    mode: EvalSelectionMode
+  ): number | undefined {
+    if (!baseModelId) return undefined;
+
+    const key = `${agentId}|||${baseModelId}|||${benchmarkName}`;
+    const pool = index.get(key);
+    if (!pool || pool.length === 0) return undefined;
+
+    const selected = selectResult(pool, mode);
+    if (!selected) return undefined;
+
+    return selected.accuracy ?? undefined;
   }
 
   async getAllModels(): Promise<ModelInfo[]> {
@@ -138,7 +293,7 @@ export class DbStorage implements IStorage {
     // due to unnamed constraint + multiple self-referencing FKs on models table
     const { data: modelsData, error: modelsError } = await supabase
       .from('models')
-      .select('id, name, agent_id, base_model_id, duplicate_of, creation_time');
+      .select('id, name, agent_id, base_model_id, duplicate_of, creation_time, training_type');
 
     if (modelsError) {
       console.error('Error fetching models:', modelsError);
@@ -200,25 +355,23 @@ export class DbStorage implements IStorage {
           baseModelDuplicateOf,
           canonicalBaseModelName,
           creationTime: row.creation_time ?? null,
+          trainingType: row.training_type ?? null,
         };
       });
   }
 
   async getBenchmarkResult(id: string): Promise<BenchmarkResult | undefined> {
     // Legacy method - not used by leaderboard
-    // Would need to query benchmark_results table if needed
     throw new Error('getBenchmarkResult is not implemented for Supabase view-based leaderboard');
   }
 
   async createBenchmarkResult(result: InsertBenchmarkResult): Promise<BenchmarkResult> {
     // Legacy method - not used by leaderboard
-    // Leaderboard data comes from sandbox_jobs view, not direct inserts
     throw new Error('createBenchmarkResult is not implemented for Supabase view-based leaderboard');
   }
 
   async deleteBenchmarkResult(id: string): Promise<void> {
     // Legacy method - not used by leaderboard
-    // Leaderboard data comes from sandbox_jobs view, not direct deletes
     throw new Error('deleteBenchmarkResult is not implemented for Supabase view-based leaderboard');
   }
 }
