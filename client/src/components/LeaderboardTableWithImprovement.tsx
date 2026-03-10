@@ -170,30 +170,67 @@ export default function LeaderboardTableWithImprovement({
     const useCanonicalBaseModel = !showDuplicateModels;
     const useCanonicalBenchmark = !showDuplicateBenchmarks;
 
-    // If not showing duplicate models, filter them out and substitute base model names
+    // If not showing duplicate models, merge duplicate rows into canonical rows then filter
     if (!showDuplicateModels) {
-      processed = processed
-        .filter(row => row.modelDuplicateOf === null)
-        .map(row => ({
-          ...row,
-          // Substitute base model name with canonical name
-          baseModelName: row.canonicalBaseModelName,
-          // Recalculate improvements for all benchmarks using canonical base model
-          benchmarks: Object.fromEntries(
-            Object.entries(row.benchmarks).map(([benchmarkName, benchmarkData]) => {
-              const { baseModelAccuracy, improvement } = recalculateImprovement(
-                benchmarkData,
-                useCanonicalBaseModel,
-                useCanonicalBenchmark
-              );
-              return [benchmarkName, {
-                ...benchmarkData,
-                baseModelAccuracy,
-                improvement
-              }];
-            })
-          )
-        }));
+      // Step 1: Separate canonical and duplicate rows
+      const canonicalRows = new Map<string, typeof processed[0]>();
+      const duplicateRows: typeof processed = [];
+
+      for (const row of processed) {
+        if (row.modelDuplicateOf === null) {
+          const key = `${row.modelName}|||${row.agentName}`;
+          canonicalRows.set(key, { ...row, benchmarks: { ...row.benchmarks } });
+        } else {
+          duplicateRows.push(row);
+        }
+      }
+
+      // Step 2: Merge duplicate rows into canonical rows
+      for (const dupRow of duplicateRows) {
+        const canonicalKey = `${dupRow.canonicalModelName}|||${dupRow.agentName}`;
+        let canonicalRow = canonicalRows.get(canonicalKey);
+
+        // Step 3: Create orphan row if canonical doesn't exist
+        if (!canonicalRow) {
+          canonicalRow = {
+            ...dupRow,
+            modelName: dupRow.canonicalModelName,
+            baseModelName: dupRow.canonicalBaseModelName,
+            modelDuplicateOf: null,
+            benchmarks: {}
+          };
+          canonicalRows.set(canonicalKey, canonicalRow);
+        }
+
+        // Merge benchmarks (only fill gaps)
+        for (const [benchmarkName, benchmarkData] of Object.entries(dupRow.benchmarks)) {
+          if (!canonicalRow.benchmarks[benchmarkName]) {
+            canonicalRow.benchmarks[benchmarkName] = { ...benchmarkData };
+          }
+        }
+
+        // Merge timestamps
+        if (dupRow.firstEvalEndedAt && (!canonicalRow.firstEvalEndedAt || dupRow.firstEvalEndedAt < canonicalRow.firstEvalEndedAt)) {
+          canonicalRow.firstEvalEndedAt = dupRow.firstEvalEndedAt;
+        }
+        if (dupRow.latestEvalEndedAt && (!canonicalRow.latestEvalEndedAt || dupRow.latestEvalEndedAt > canonicalRow.latestEvalEndedAt)) {
+          canonicalRow.latestEvalEndedAt = dupRow.latestEvalEndedAt;
+        }
+      }
+
+      // Step 4: Convert back, substitute base model names, recalculate improvements
+      processed = Array.from(canonicalRows.values()).map(row => ({
+        ...row,
+        baseModelName: row.canonicalBaseModelName,
+        benchmarks: Object.fromEntries(
+          Object.entries(row.benchmarks).map(([benchmarkName, benchmarkData]) => {
+            const { baseModelAccuracy, improvement } = recalculateImprovement(
+              benchmarkData, useCanonicalBaseModel, useCanonicalBenchmark
+            );
+            return [benchmarkName, { ...benchmarkData, baseModelAccuracy, improvement }];
+          })
+        )
+      }));
     }
 
     // If not showing duplicate benchmarks, merge duplicate benchmark results into canonical columns
