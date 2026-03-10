@@ -259,6 +259,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Remove NO EVAL rows for models that actually have eval rows
+      // (defensive: handles edge cases where modelNamesWithEvals check is insufficient)
+      const modelsWithRealEvals = new Set<string>();
+      groupedData.forEach((group) => {
+        if (!group.isNoEval) modelsWithRealEvals.add(group.modelName);
+      });
+      groupedData.forEach((group, key) => {
+        if (group.isNoEval && modelsWithRealEvals.has(group.modelName)) {
+          groupedData.delete(key);
+        }
+      });
+
       // Convert to array and sort by model name, then agent name
       const pivotedData = Array.from(groupedData.values()).sort((a, b) => {
         const modelCompare = a.modelName.localeCompare(b.modelName);

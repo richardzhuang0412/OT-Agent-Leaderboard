@@ -231,6 +231,14 @@ export default function LeaderboardTableWithImprovement({
           })
         )
       }));
+
+      // Step 5: Remove NO EVAL rows for models that have real eval rows
+      // (duplicate models may produce orphan NO EVAL rows under the canonical name)
+      const modelsWithRealEvals = new Set<string>();
+      for (const row of processed) {
+        if (!row.isNoEval) modelsWithRealEvals.add(row.modelName);
+      }
+      processed = processed.filter(row => !(row.isNoEval && modelsWithRealEvals.has(row.modelName)));
     }
 
     // If not showing duplicate benchmarks, merge duplicate benchmark results into canonical columns
