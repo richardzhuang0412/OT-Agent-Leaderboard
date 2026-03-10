@@ -126,7 +126,7 @@ function formatTimestampField(ts: string | null): string | undefined {
 
 export interface IStorage {
   getAllBenchmarkResults(): Promise<BenchmarkResultExtended[]>;
-  getAllBenchmarkResultsWithImprovement(mode?: EvalSelectionMode): Promise<BenchmarkResultWithImprovement[]>;
+  getAllBenchmarkResultsWithImprovement(mode?: EvalSelectionMode, hideNoTraceLink?: boolean): Promise<BenchmarkResultWithImprovement[]>;
   getAllModels(): Promise<ModelInfo[]>;
   getBenchmarkResult(id: string): Promise<BenchmarkResult | undefined>;
   createBenchmarkResult(result: InsertBenchmarkResult): Promise<BenchmarkResult>;
@@ -191,8 +191,14 @@ export class DbStorage implements IStorage {
     return results;
   }
 
-  async getAllBenchmarkResultsWithImprovement(mode: EvalSelectionMode = 'oldest'): Promise<BenchmarkResultWithImprovement[]> {
-    const allRows = await this.fetchAllRawRows();
+  async getAllBenchmarkResultsWithImprovement(mode: EvalSelectionMode = 'oldest', hideNoTraceLink: boolean = false): Promise<BenchmarkResultWithImprovement[]> {
+    let allRows = await this.fetchAllRawRows();
+
+    // Filter out rows without trace links before pool building
+    if (hideNoTraceLink) {
+      allRows = allRows.filter(row => row.hf_traces_link != null && row.hf_traces_link !== '');
+    }
+
     const index = this.buildGroupIndex(allRows);
 
     const results: BenchmarkResultWithImprovement[] = [];
