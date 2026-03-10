@@ -42,10 +42,11 @@ export default function Leaderboard() {
   // Duplicate display controls (default: hide duplicates)
   const [showDuplicateBenchmarks, setShowDuplicateBenchmarks] = useState(false);
   const [showDuplicateModels, setShowDuplicateModels] = useState(false);
+  const [hideNoTraceLink, setHideNoTraceLink] = useState(false);
 
   // Always fetch improvement metrics data (query key includes mode for per-mode caching)
   const { data: pivotedData = [], isLoading, isFetching, refetch } = useQuery<PivotedLeaderboardRowWithImprovement[]>({
-    queryKey: [`/api/leaderboard-pivoted-with-improvement?mode=${selectionMode}`],
+    queryKey: [`/api/leaderboard-pivoted-with-improvement?mode=${selectionMode}&hideNoTraceLink=${hideNoTraceLink}`],
   });
 
   const handleRefresh = () => {
@@ -372,6 +373,19 @@ export default function Leaderboard() {
                   Show duplicate models
                 </label>
               </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="hide-no-trace-link"
+                  checked={hideNoTraceLink}
+                  onCheckedChange={(checked) => setHideNoTraceLink(checked === true)}
+                />
+                <label
+                  htmlFor="hide-no-trace-link"
+                  className="text-sm text-muted-foreground cursor-pointer select-none"
+                >
+                  Hide evals with no trace link
+                </label>
+              </div>
             </div>
           </div>
 
@@ -583,6 +597,19 @@ export default function Leaderboard() {
                     className="text-sm text-muted-foreground cursor-pointer select-none"
                   >
                     Show duplicate models
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="hide-no-trace-link-all"
+                    checked={hideNoTraceLink}
+                    onCheckedChange={(checked) => setHideNoTraceLink(checked === true)}
+                  />
+                  <label
+                    htmlFor="hide-no-trace-link-all"
+                    className="text-sm text-muted-foreground cursor-pointer select-none"
+                  >
+                    Hide evals with no trace link
                   </label>
                 </div>
               </div>

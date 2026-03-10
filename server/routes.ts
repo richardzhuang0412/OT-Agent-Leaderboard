@@ -95,7 +95,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? modeParam as EvalSelectionMode
         : 'oldest';
 
-      const results = await storage.getAllBenchmarkResultsWithImprovement(mode);
+      const hideNoTraceLink = req.query.hideNoTraceLink === 'true';
+      const results = await storage.getAllBenchmarkResultsWithImprovement(mode, hideNoTraceLink);
 
       // Group by (model, agent) combination
       const groupedData = new Map<string, {
