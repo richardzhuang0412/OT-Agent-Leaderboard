@@ -30,8 +30,8 @@ export interface PivotedLeaderboardRowWithImprovement {
   canonicalModelName: string;
   canonicalBaseModelName: string;
   benchmarks: Record<string, {
-    accuracy: number;
-    standardError: number;
+    accuracy: number | null;
+    standardError: number | null;
     hfTracesLink?: string;
     baseModelAccuracy?: number;
     improvement?: number;
@@ -50,6 +50,9 @@ export interface PivotedLeaderboardRowWithImprovement {
     daytonaOverrideCpus?: number;
     daytonaOverrideMemoryMb?: number;
     daytonaOverrideStorageMb?: number;
+    // Job status for progress tracking
+    jobStatus?: string | null;
+    username?: string | null;
   }>;
 }
 
@@ -129,7 +132,7 @@ export default function LeaderboardTableWithImprovement({
   // Helper function to recalculate improvement based on display settings
   const recalculateImprovement = (
     benchmarkData: {
-      accuracy: number;
+      accuracy: number | null;
       baseModelAccuracy?: number;
       canonicalBenchmarkBaseModelAccuracy?: number;
       canonicalBaseModelAccuracy?: number;
@@ -138,6 +141,11 @@ export default function LeaderboardTableWithImprovement({
     useCanonicalBaseModel: boolean,
     useCanonicalBenchmark: boolean
   ): { baseModelAccuracy?: number; improvement?: number } => {
+    // No improvement calculation for Pending/Started jobs (null accuracy)
+    if (benchmarkData.accuracy === null) {
+      return { baseModelAccuracy: undefined, improvement: undefined };
+    }
+
     // Determine which base model accuracy to use based on display settings
     let newBaseModelAccuracy: number | undefined;
 
@@ -202,9 +210,13 @@ export default function LeaderboardTableWithImprovement({
           canonicalRows.set(canonicalKey, canonicalRow);
         }
 
-        // Merge benchmarks (only fill gaps)
+        // Merge benchmarks: fill gaps, and prefer Finished over Pending/Started
         for (const [benchmarkName, benchmarkData] of Object.entries(dupRow.benchmarks)) {
-          if (!canonicalRow.benchmarks[benchmarkName]) {
+          const existing = canonicalRow.benchmarks[benchmarkName];
+          if (!existing) {
+            canonicalRow.benchmarks[benchmarkName] = { ...benchmarkData };
+          } else if (existing.accuracy === null && benchmarkData.accuracy !== null) {
+            // Canonical has Pending/Started, duplicate has Finished — prefer Finished
             canonicalRow.benchmarks[benchmarkName] = { ...benchmarkData };
           }
         }
@@ -251,8 +263,8 @@ export default function LeaderboardTableWithImprovement({
           const duplicateData = newBenchmarks[duplicateName];
           const canonicalData = newBenchmarks[canonicalName];
 
-          // If we have duplicate data but no canonical data, copy it over
-          if (duplicateData && !canonicalData) {
+          // Copy duplicate data if canonical is missing or canonical is Pending/Started and duplicate is Finished
+          if (duplicateData && (!canonicalData || (canonicalData.accuracy === null && duplicateData.accuracy !== null))) {
             // Recalculate improvement for merged data (comparing to canonical benchmark)
             const { baseModelAccuracy, improvement } = recalculateImprovement(
               duplicateData,
@@ -397,13 +409,13 @@ export default function LeaderboardTableWithImprovement({
             aVal = a.benchmarks[sortField]?.improvement;
             bVal = b.benchmarks[sortField]?.improvement;
           } else {
-            // Sort by accuracy
-            aVal = a.benchmarks[sortField]?.accuracy;
-            bVal = b.benchmarks[sortField]?.accuracy;
+            // Sort by accuracy — null accuracy (Pending/Started) treated as undefined to sort to bottom
+            aVal = a.benchmarks[sortField]?.accuracy ?? undefined;
+            bVal = b.benchmarks[sortField]?.accuracy ?? undefined;
           }
         }
 
-        // Handle undefined values (missing benchmark data or timestamp)
+        // Handle undefined/null values (missing benchmark data, Pending/Started, or timestamp)
         if (aVal === undefined && bVal === undefined) return 0;
         if (aVal === undefined) return 1;
         if (bVal === undefined) return -1;
@@ -498,8 +510,8 @@ export default function LeaderboardTableWithImprovement({
 
   const formatBenchmarkCell = (
     benchmarkData?: {
-      accuracy: number;
-      standardError: number;
+      accuracy: number | null;
+      standardError: number | null;
       hfTracesLink?: string;
       baseModelAccuracy?: number;
       improvement?: number;
@@ -507,12 +519,64 @@ export default function LeaderboardTableWithImprovement({
       daytonaOverrideCpus?: number;
       daytonaOverrideMemoryMb?: number;
       daytonaOverrideStorageMb?: number;
+      jobStatus?: string | null;
+      username?: string | null;
     },
     benchmarkName?: string
   ) => {
     if (!benchmarkData) {
       return <span className="text-muted-foreground text-sm">—</span>;
     }
+
+    // Pending/Started jobs: show status badge instead of accuracy
+    const jobStatus = benchmarkData.jobStatus;
+    if (jobStatus === 'Pending' || jobStatus === 'Started') {
+      const isPending = jobStatus === 'Pending';
+      const badgeClass = isPending
+        ? 'bg-blue-500/15 text-blue-500 border-blue-500/30'
+        : 'bg-amber-500/15 text-amber-500 border-amber-500/30';
+      const label = isPending ? 'Pending' : 'Running';
+      const tooltipParts: string[] = [];
+      if (benchmarkData.username) tooltipParts.push(`User: ${benchmarkData.username}`);
+
+      return (
+        <div className="flex items-center gap-2 justify-end">
+          {/* Config metadata badges — stacked vertically */}
+          <div className="flex flex-col gap-1 items-start">
+            <span className={`font-mono text-[10px] rounded-full px-2 py-0.5 border ${
+              benchmarkData.timeoutMultiplier != null
+                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/25'
+                : 'bg-muted/50 text-muted-foreground/50 border-muted-foreground/20'
+            }`}>
+              T:{benchmarkData.timeoutMultiplier != null ? `${benchmarkData.timeoutMultiplier}x` : 'N/A'}
+            </span>
+            <span className={`font-mono text-[10px] rounded-full px-2 py-0.5 border ${
+              (benchmarkData.daytonaOverrideCpus != null || benchmarkData.daytonaOverrideMemoryMb != null || benchmarkData.daytonaOverrideStorageMb != null)
+                ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/25'
+                : 'bg-muted/50 text-muted-foreground/50 border-muted-foreground/20'
+            }`}>
+              D:{benchmarkData.daytonaOverrideCpus ?? '?'}/{benchmarkData.daytonaOverrideMemoryMb != null ? (benchmarkData.daytonaOverrideMemoryMb / 1024).toFixed(0) : '?'}/{benchmarkData.daytonaOverrideStorageMb != null ? (benchmarkData.daytonaOverrideStorageMb / 1024).toFixed(0) : '?'}
+            </span>
+          </div>
+          {/* Status badge */}
+          <div className="flex flex-col items-end gap-1">
+            <span
+              className={`inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-semibold ${badgeClass}`}
+              title={tooltipParts.length > 0 ? tooltipParts.join('\n') : undefined}
+            >
+              {label}
+            </span>
+            {benchmarkData.username && (
+              <span className="font-mono text-[10px] text-muted-foreground truncate max-w-[100px]">
+                {benchmarkData.username}
+              </span>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // Finished jobs (or legacy rows without jobStatus): show accuracy as before
 
     // Special handling for dev_set_71_tasks: show red warning flag for missing links
     const isDevSet71Tasks = benchmarkName === 'dev_set_71_tasks';
@@ -563,12 +627,18 @@ export default function LeaderboardTableWithImprovement({
         </div>
         {/* Numbers column — right-aligned */}
         <div className="flex flex-col items-end gap-1">
-          <span className={`font-mono font-semibold text-sm ${getAccuracyColor(benchmarkData.accuracy)}`}>
-            {benchmarkData.accuracy.toFixed(1)}%
-          </span>
-          <span className="font-mono text-xs text-muted-foreground">
-            ±{benchmarkData.standardError.toFixed(2)}
-          </span>
+          {benchmarkData.accuracy != null ? (
+            <span className={`font-mono font-semibold text-sm ${getAccuracyColor(benchmarkData.accuracy)}`}>
+              {benchmarkData.accuracy.toFixed(1)}%
+            </span>
+          ) : (
+            <span className="font-mono text-sm text-muted-foreground">--</span>
+          )}
+          {benchmarkData.standardError != null ? (
+            <span className="font-mono text-xs text-muted-foreground">
+              ±{benchmarkData.standardError.toFixed(2)}
+            </span>
+          ) : null}
           {benchmarkData.improvement !== undefined && (
             <span className={`font-mono text-xs font-medium ${getImprovementColor(benchmarkData.improvement)}`}>
               {benchmarkData.improvement >= 0 ? '+' : ''}{benchmarkData.improvement.toFixed(2)} pp

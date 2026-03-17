@@ -39,6 +39,9 @@ export interface BenchmarkResultWithImprovement extends BenchmarkResultExtended 
   daytonaOverrideStorageMb?: number;
   // Training type
   trainingType?: string;
+  // Job status for progress tracking
+  jobStatus: string | null;
+  username: string | null;
 }
 
 export interface ModelInfo {
@@ -82,37 +85,64 @@ interface RawLeaderboardRow {
   canonical_base_model_id: string | null;
   config: any;
   training_type: string | null;
+  job_status: string | null;
+  username: string | null;
 }
+
+const JOB_STATUS_PRIORITY: Record<string, number> = {
+  'Finished': 0,
+  'Started': 1,
+  'Pending': 2,
+};
 
 /**
  * Select one result from a pool of results based on the eval selection mode.
+ * Priority: Finished > Started > Pending. Among Finished results:
  * - oldest: prefer accuracy > 1% → then earliest timestamp
  * - latest: prefer accuracy > 1% → then latest timestamp
  * - highest: highest accuracy (no threshold)
+ * Among non-Finished results (no accuracy): prefer Started over Pending, then latest timestamp.
  */
 function selectResult(pool: RawLeaderboardRow[], mode: EvalSelectionMode): RawLeaderboardRow | null {
   if (pool.length === 0) return null;
 
-  if (mode === 'highest') {
-    // Simply pick the highest accuracy
-    let best = pool[0];
-    for (const row of pool) {
-      if ((row.accuracy ?? 0) > (best.accuracy ?? 0)) {
-        best = row;
+  // Separate Finished (have accuracy) from Pending/Started
+  const finished = pool.filter(r => r.accuracy !== null);
+  const nonFinished = pool.filter(r => r.accuracy === null);
+
+  // If we have any Finished results, use existing selection logic among those
+  if (finished.length > 0) {
+    if (mode === 'highest') {
+      let best = finished[0];
+      for (const row of finished) {
+        if ((row.accuracy ?? 0) > (best.accuracy ?? 0)) {
+          best = row;
+        }
       }
+      return best;
     }
-    return best;
+
+    // For oldest/latest: prefer results with accuracy > 1%, then sort by timestamp
+    const aboveThreshold = finished.filter(r => (r.accuracy ?? 0) > 1.0);
+    const candidates = aboveThreshold.length > 0 ? aboveThreshold : finished;
+
+    const sorted = [...candidates].sort((a, b) => {
+      const tsA = a.ended_at ? new Date(a.ended_at).getTime() : 0;
+      const tsB = b.ended_at ? new Date(b.ended_at).getTime() : 0;
+      return mode === 'oldest' ? tsA - tsB : tsB - tsA;
+    });
+
+    return sorted[0];
   }
 
-  // For oldest/latest: prefer results with accuracy > 1%, then sort by timestamp
-  const aboveThreshold = pool.filter(r => (r.accuracy ?? 0) > 1.0);
-  const candidates = aboveThreshold.length > 0 ? aboveThreshold : pool;
-
-  // Sort by timestamp
-  const sorted = [...candidates].sort((a, b) => {
+  // No Finished results — pick best non-Finished: Started > Pending, then latest timestamp
+  const sorted = [...nonFinished].sort((a, b) => {
+    const aPri = JOB_STATUS_PRIORITY[a.job_status ?? 'Pending'] ?? 3;
+    const bPri = JOB_STATUS_PRIORITY[b.job_status ?? 'Pending'] ?? 3;
+    if (aPri !== bPri) return aPri - bPri;
     const tsA = a.ended_at ? new Date(a.ended_at).getTime() : 0;
     const tsB = b.ended_at ? new Date(b.ended_at).getTime() : 0;
-    return mode === 'oldest' ? tsA - tsB : tsB - tsA;
+    return tsB - tsA; // latest first
   });
 
   return sorted[0];
@@ -265,6 +295,8 @@ export class DbStorage implements IStorage {
         daytonaOverrideMemoryMb,
         daytonaOverrideStorageMb,
         trainingType: selected.training_type ?? undefined,
+        jobStatus: selected.job_status ?? null,
+        username: selected.username ?? null,
       });
     }
 
