@@ -1,8 +1,8 @@
 -- Create leaderboard_results view for the leaderboard application
 -- Run this in Supabase SQL Editor: Project → SQL Editor → New Query
 
--- This view returns ALL valid evaluation results from sandbox_jobs
--- Parses accuracy and accuracy_stderr from the metrics JSONB array
+-- This view returns ALL evaluation results from sandbox_jobs (Finished, Started, Pending)
+-- Parses accuracy and accuracy_stderr from the metrics JSONB array for Finished jobs
 -- Includes base model and duplicate tracking metadata
 -- NO deduplication — the server selects which result to show per (model, agent, benchmark)
 
@@ -10,8 +10,8 @@
 DROP VIEW IF EXISTS leaderboard_results CASCADE;
 
 CREATE VIEW leaderboard_results AS
-WITH job_metrics AS (
-  -- Pre-compute accuracy for all jobs with metrics
+WITH finished_jobs AS (
+  -- Finished jobs: have metrics with computed accuracy
   SELECT
     sj.*,
     COALESCE(sj.ended_at, sj.created_at) as job_timestamp,
@@ -23,6 +23,21 @@ WITH job_metrics AS (
      WHERE elem->>'name' = 'accuracy_stderr' LIMIT 1) as computed_accuracy_stderr
   FROM sandbox_jobs sj
   WHERE sj.metrics IS NOT NULL
+),
+pending_started_jobs AS (
+  -- Pending/Started jobs: no metrics yet
+  SELECT
+    sj.*,
+    COALESCE(sj.started_at, sj.created_at) as job_timestamp,
+    NULL::float as computed_accuracy,
+    NULL::float as computed_accuracy_stderr
+  FROM sandbox_jobs sj
+  WHERE sj.metrics IS NULL
+),
+all_jobs AS (
+  SELECT * FROM finished_jobs
+  UNION ALL
+  SELECT * FROM pending_started_jobs
 )
 SELECT
   gen_random_uuid()::text as id,
@@ -45,24 +60,27 @@ SELECT
   -- Track which actual benchmark this result came from
   b.name as source_benchmark_name,
   b.id as source_benchmark_id,
-  jm.computed_accuracy as accuracy,
-  jm.computed_accuracy_stderr as standard_error,
-  jm.hf_traces_link as hf_traces_link,
-  jm.job_timestamp as ended_at,
+  aj.computed_accuracy as accuracy,
+  aj.computed_accuracy_stderr as standard_error,
+  aj.hf_traces_link as hf_traces_link,
+  aj.job_timestamp as ended_at,
   -- Expose base model resolution fields for server-side base model accuracy computation
   COALESCE(bm.duplicate_of, m.base_model_id) as canonical_base_model_id,
   -- Eval config and training type metadata
-  jm.config as config,
-  m.training_type as training_type
-FROM job_metrics jm
-INNER JOIN agents a ON jm.agent_id = a.id
-INNER JOIN models m ON jm.model_id = m.id
-INNER JOIN benchmarks b ON jm.benchmark_id = b.id
+  aj.config as config,
+  m.training_type as training_type,
+  -- Job status and user info for progress tracking
+  aj.job_status::text as job_status,
+  aj.username as username
+FROM all_jobs aj
+INNER JOIN agents a ON aj.agent_id = a.id
+INNER JOIN models m ON aj.model_id = m.id
+INNER JOIN benchmarks b ON aj.benchmark_id = b.id
 LEFT JOIN models bm ON m.base_model_id = bm.id
 LEFT JOIN models m_canonical ON m.duplicate_of = m_canonical.id
 LEFT JOIN models bm_canonical ON bm.duplicate_of = bm_canonical.id
 LEFT JOIN benchmarks b_canonical ON b.duplicate_of = b_canonical.id
-ORDER BY a.name, m.name, COALESCE(b_canonical.name, b.name), jm.job_timestamp;
+ORDER BY a.name, m.name, COALESCE(b_canonical.name, b.name), aj.job_timestamp;
 
 -- Grant read access to the view
 -- Adjust the role name based on your Supabase setup

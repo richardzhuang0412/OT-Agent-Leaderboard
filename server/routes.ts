@@ -115,8 +115,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         canonicalModelName: string;
         canonicalBaseModelName: string;
         benchmarks: Record<string, {
-          accuracy: number;
-          standardError: number;
+          accuracy: number | null;
+          standardError: number | null;
           hfTracesLink?: string;
           baseModelAccuracy?: number;
           improvement?: number;
@@ -135,6 +135,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           daytonaOverrideCpus?: number;
           daytonaOverrideMemoryMb?: number;
           daytonaOverrideStorageMb?: number;
+          // Job status for progress tracking
+          jobStatus: string | null;
+          username: string | null;
         }>;
       }>();
 
@@ -169,14 +172,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!group.latestEvalEndedAt || (result.endedAt && result.endedAt > group.latestEvalEndedAt)) {
           group.latestEvalEndedAt = result.endedAt;
         }
-        // Calculate improvement as absolute difference (percentage points)
-        const improvement = result.baseModelAccuracy !== undefined
+        // For Pending/Started jobs, accuracy/standardError are 0 (from storage default) — treat as null
+        const isFinished = result.jobStatus === 'Finished' || result.jobStatus === null;
+        const accuracy = isFinished ? result.accuracy : null;
+        const standardError = isFinished ? result.standardError : null;
+
+        // Calculate improvement as absolute difference (percentage points) — only for Finished jobs
+        const improvement = (isFinished && result.baseModelAccuracy !== undefined)
           ? result.accuracy - result.baseModelAccuracy
           : undefined;
 
         group.benchmarks[result.benchmarkName] = {
-          accuracy: result.accuracy,
-          standardError: result.standardError,
+          accuracy,
+          standardError,
           hfTracesLink: result.hfTracesLink,
           baseModelAccuracy: result.baseModelAccuracy,
           improvement: improvement,
@@ -194,7 +202,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           timeoutMultiplier: result.timeoutMultiplier,
           daytonaOverrideCpus: result.daytonaOverrideCpus,
           daytonaOverrideMemoryMb: result.daytonaOverrideMemoryMb,
-          daytonaOverrideStorageMb: result.daytonaOverrideStorageMb
+          daytonaOverrideStorageMb: result.daytonaOverrideStorageMb,
+          // Job status for progress tracking
+          jobStatus: result.jobStatus,
+          username: result.username,
         };
       }
 
