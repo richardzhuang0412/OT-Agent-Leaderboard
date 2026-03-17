@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { ChevronUp, ChevronDown, ChevronsUpDown, ExternalLink, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { BLACKLISTED_MODELS } from '@/config/blacklistedModels';
 
 // Hide scrollbar while keeping scroll functionality
 const scrollbarHidingStyles = `
@@ -88,8 +89,8 @@ export default function LeaderboardTableWithImprovement({
   showDuplicateBenchmarks,
   showDuplicateModels
 }: LeaderboardTableWithImprovementProps) {
-  const [sortField, setSortField] = useState<SortField>('modelName');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [sortField, setSortField] = useState<SortField>('modelCreatedAt');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [sortModePerBenchmark, setSortModePerBenchmark] = useState<Record<string, SortMode>>({});
   const tableScrollContainerRef = useRef<HTMLDivElement>(null);
   const topScrollBarRef = useRef<HTMLDivElement>(null);
@@ -796,12 +797,17 @@ export default function LeaderboardTableWithImprovement({
               ) : (
                 filteredAndSortedData.map((row, index) => {
                   const isBaseModel = row.baseModelName === 'None';
+                  const isBlacklisted = BLACKLISTED_MODELS.has(row.modelName);
                   const rowBgClass = isBaseModel
                     ? 'bg-blue-100 dark:bg-blue-900/60'
-                    : index % 2 === 0 ? 'bg-background' : 'bg-muted/20';
+                    : isBlacklisted
+                      ? 'bg-neutral-200 dark:bg-neutral-800/70'
+                      : index % 2 === 0 ? 'bg-background' : 'bg-muted/20';
                   const stickyCellBgClass = isBaseModel
                     ? 'bg-blue-100 dark:bg-blue-900/60'
-                    : 'bg-background';
+                    : isBlacklisted
+                      ? 'bg-neutral-200 dark:bg-neutral-800/70'
+                      : 'bg-background';
 
                   return (
                     <tr

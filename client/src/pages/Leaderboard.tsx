@@ -12,6 +12,7 @@ import FilterControlsWithBaseModel from '@/components/FilterControlsWithBaseMode
 import ViewModeControls from '@/components/ViewModeControls';
 import ThemeToggle from '@/components/ThemeToggle';
 import { DEFAULT_VISIBLE_BENCHMARKS } from '@/config/benchmarkConfig';
+import { BLACKLISTED_MODELS } from '@/config/blacklistedModels';
 
 type EvalSelectionMode = 'oldest' | 'latest' | 'highest';
 
@@ -24,8 +25,8 @@ const SELECTION_MODE_DESCRIPTIONS: Record<EvalSelectionMode, string> = {
 const EVAL_AGENT_NAMES = new Set(['terminus-2', 'openhands', 'mini-swe-agent', 'swe-agent']);
 
 export default function Leaderboard() {
-  const [selectionMode, setSelectionMode] = useState<EvalSelectionMode>('oldest');
-  const [activeTab, setActiveTab] = useState<'filtered' | 'all'>('filtered');
+  const [selectionMode, setSelectionMode] = useState<EvalSelectionMode>('highest');
+  const [activeTab, setActiveTab] = useState<'filtered' | 'all' | 'blacklisted' | 'base' | 'active'>('all');
   const [topN, setTopN] = useState<number>(50);
   const [recentlyAddedN, setRecentlyAddedN] = useState<number>(50);
   const [recentlyEvaledN, setRecentlyEvaledN] = useState<number>(50);
@@ -54,8 +55,12 @@ export default function Leaderboard() {
   };
 
   const availableModels = useMemo(() => {
-    return Array.from(new Set(pivotedData.map((item) => item.modelName))).sort();
-  }, [pivotedData]);
+    let models = pivotedData;
+    if (!showDuplicateModels) {
+      models = models.filter(item => item.modelDuplicateOf === null);
+    }
+    return Array.from(new Set(models.map((item) => item.modelName))).sort();
+  }, [pivotedData, showDuplicateModels]);
 
   const availableAgents = useMemo(() => {
     return Array.from(new Set(pivotedData.map((item) => item.agentName))).sort();
@@ -77,18 +82,23 @@ export default function Leaderboard() {
   }, [pivotedData]);
 
   const availableBaseModels = useMemo(() => {
+    const field = showDuplicateModels ? 'baseModelName' : 'canonicalBaseModelName';
     return Array.from(new Set(
-      pivotedData.map((item) => item.baseModelName).filter(Boolean)
+      pivotedData.map((item) => item[field]).filter(Boolean)
     )).sort();
-  }, [pivotedData]);
+  }, [pivotedData, showDuplicateModels]);
 
   const availableBenchmarks = useMemo(() => {
     const benchmarkSet = new Set<string>();
     pivotedData.forEach(row => {
-      Object.keys(row.benchmarks).forEach(benchmark => benchmarkSet.add(benchmark));
+      Object.entries(row.benchmarks).forEach(([name, data]) => {
+        if (showDuplicateBenchmarks || !data.benchmarkDuplicateOf) {
+          benchmarkSet.add(name);
+        }
+      });
     });
     return Array.from(benchmarkSet).sort();
-  }, [pivotedData]);
+  }, [pivotedData, showDuplicateBenchmarks]);
 
   // Build a map of duplicate benchmark -> canonical benchmark from the data
   const benchmarkDuplicateMap = useMemo(() => {
@@ -121,8 +131,8 @@ export default function Leaderboard() {
 
   // Filter by view mode: Top N + Recent N
   const filteredByViewMode = useMemo(() => {
-    if (activeTab === 'all') {
-      return pivotedData; // No filtering
+    if (activeTab !== 'filtered') {
+      return pivotedData; // No filtering for non-filtered tabs
     }
 
     // Helper function to get accuracy for sorting (canonical or duplicate fallback)
@@ -194,6 +204,24 @@ export default function Leaderboard() {
 
     return Array.from(uniqueMap.values());
   }, [pivotedData, activeTab, topN, recentlyAddedN, recentlyEvaledN, topPerformerBenchmark, canonicalToDuplicatesMap]);
+
+  // Pre-filter data based on active tab
+  const tabFilteredData = useMemo(() => {
+    switch (activeTab) {
+      case 'blacklisted':
+        return pivotedData.filter(row => BLACKLISTED_MODELS.has(row.modelName));
+      case 'base':
+        return pivotedData.filter(row => row.baseModelName === 'None');
+      case 'active':
+        return pivotedData.filter(row =>
+          row.baseModelName !== 'None' && !BLACKLISTED_MODELS.has(row.modelName)
+        );
+      case 'all':
+        return pivotedData;
+      case 'filtered':
+        return filteredByViewMode;
+    }
+  }, [activeTab, pivotedData, filteredByViewMode]);
 
   // Initialize selectedBenchmarks with defaults only on first data load
   const hasInitializedBenchmarks = useRef(false);
@@ -291,10 +319,13 @@ export default function Leaderboard() {
           )}
         </div>
 
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'filtered' | 'all')}>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
           <TabsList>
-            <TabsTrigger value="filtered">Filtered View</TabsTrigger>
             <TabsTrigger value="all">All Models</TabsTrigger>
+            <TabsTrigger value="filtered">Filtered View</TabsTrigger>
+            <TabsTrigger value="active">Active</TabsTrigger>
+            <TabsTrigger value="blacklisted">Blacklisted</TabsTrigger>
+            <TabsTrigger value="base">Base Models</TabsTrigger>
           </TabsList>
 
           <TabsContent value="filtered" className="space-y-6">
@@ -395,8 +426,11 @@ export default function Leaderboard() {
               <div className="flex items-start gap-2">
                 <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-medium text-foreground">Base Model Highlighting</p>
-                  <p className="text-xs">Rows with a blue background indicate base models (models with no base model). These are the foundation models that other models are fine-tuned from.</p>
+                  <p className="font-medium text-foreground">Row Highlighting</p>
+                  <p className="text-xs">
+                    <span className="inline-block w-3 h-3 rounded bg-blue-100 dark:bg-blue-900/60 border mr-1 align-middle" /> Base models (no base model).{' '}
+                    <span className="inline-block w-3 h-3 rounded bg-neutral-200 dark:bg-neutral-800/70 border mr-1 align-middle" /> Blacklisted models.
+                  </p>
                 </div>
               </div>
             </div>
@@ -536,230 +570,236 @@ export default function Leaderboard() {
             />
           </TabsContent>
 
-          <TabsContent value="all" className="space-y-6">
-            <SearchBarWithBaseModel
-              modelSearch={modelSearch}
-              agentSearch={agentSearch}
-              baseModelSearch={baseModelSearch}
-              benchmarkSearch={benchmarkSearch}
-              onModelSearchChange={setModelSearch}
-              onAgentSearchChange={setAgentSearch}
-              onBaseModelSearchChange={setBaseModelSearch}
-              onBenchmarkSearchChange={setBenchmarkSearch}
-            />
-
-            {/* Filters */}
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-              <FilterControlsWithBaseModel
-                availableModels={availableModels}
-                availableAgents={availableAgents}
-                availableEvalAgents={availableEvalAgents}
-                availableTrainingAgents={availableTrainingAgents}
-                availableBaseModels={availableBaseModels}
-                availableBenchmarks={availableBenchmarks}
-                selectedModels={selectedModels}
-                selectedAgents={selectedAgents}
-                selectedTrainingAgents={selectedTrainingAgents}
-                selectedBaseModels={selectedBaseModels}
-                selectedBenchmarks={selectedBenchmarks}
-                onModelsChange={setSelectedModels}
-                onAgentsChange={setSelectedAgents}
-                onTrainingAgentsChange={setSelectedTrainingAgents}
-                onBaseModelsChange={setSelectedBaseModels}
-                onBenchmarksChange={setSelectedBenchmarks}
-                onClearAll={handleClearFilters}
-                onReset={handleResetFilters}
+          {/* Shared content for all non-filtered tabs */}
+          {(['all', 'active', 'blacklisted', 'base'] as const).map(tabValue => (
+            <TabsContent key={tabValue} value={tabValue} className="space-y-6">
+              <SearchBarWithBaseModel
+                modelSearch={modelSearch}
+                agentSearch={agentSearch}
+                baseModelSearch={baseModelSearch}
+                benchmarkSearch={benchmarkSearch}
+                onModelSearchChange={setModelSearch}
+                onAgentSearchChange={setAgentSearch}
+                onBaseModelSearchChange={setBaseModelSearch}
+                onBenchmarkSearchChange={setBenchmarkSearch}
               />
 
-              {/* Duplicate Display Controls */}
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="show-duplicate-benchmarks-all"
-                    checked={showDuplicateBenchmarks}
-                    onCheckedChange={(checked) => setShowDuplicateBenchmarks(checked === true)}
-                  />
-                  <label
-                    htmlFor="show-duplicate-benchmarks-all"
-                    className="text-sm text-muted-foreground cursor-pointer select-none"
-                  >
-                    Show duplicate benchmarks
-                  </label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="show-duplicate-models-all"
-                    checked={showDuplicateModels}
-                    onCheckedChange={(checked) => setShowDuplicateModels(checked === true)}
-                  />
-                  <label
-                    htmlFor="show-duplicate-models-all"
-                    className="text-sm text-muted-foreground cursor-pointer select-none"
-                  >
-                    Show duplicate models
-                  </label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="hide-no-trace-link-all"
-                    checked={hideNoTraceLink}
-                    onCheckedChange={(checked) => setHideNoTraceLink(checked === true)}
-                  />
-                  <label
-                    htmlFor="hide-no-trace-link-all"
-                    className="text-sm text-muted-foreground cursor-pointer select-none"
-                  >
-                    Hide evals with no trace link
-                  </label>
-                </div>
-              </div>
-            </div>
+              {/* Filters */}
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <FilterControlsWithBaseModel
+                  availableModels={availableModels}
+                  availableAgents={availableAgents}
+                  availableEvalAgents={availableEvalAgents}
+                  availableTrainingAgents={availableTrainingAgents}
+                  availableBaseModels={availableBaseModels}
+                  availableBenchmarks={availableBenchmarks}
+                  selectedModels={selectedModels}
+                  selectedAgents={selectedAgents}
+                  selectedTrainingAgents={selectedTrainingAgents}
+                  selectedBaseModels={selectedBaseModels}
+                  selectedBenchmarks={selectedBenchmarks}
+                  onModelsChange={setSelectedModels}
+                  onAgentsChange={setSelectedAgents}
+                  onTrainingAgentsChange={setSelectedTrainingAgents}
+                  onBaseModelsChange={setSelectedBaseModels}
+                  onBenchmarksChange={setSelectedBenchmarks}
+                  onClearAll={handleClearFilters}
+                  onReset={handleResetFilters}
+                />
 
-            <div className="space-y-4 px-3 py-3 bg-muted/30 rounded-md text-sm text-muted-foreground">
-              {/* Row Highlighting */}
-              <div className="space-y-2">
-                <div className="flex items-start gap-2">
-                  <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-foreground">Base Model Highlighting</p>
-                    <p className="text-xs">Rows with a blue background indicate base models (models with no base model). These are the foundation models that other models are fine-tuned from.</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Metrics Explanation */}
-              <div className="space-y-2">
-                <div className="flex items-start gap-2">
-                  <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-foreground">Standard Error (±)</p>
-                    <p className="text-xs">Calculated over 3 runs. Shows variability in model performance.</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2 ml-6">
-                  <div className="w-4 h-4" />
-                  <div>
-                    <p className="font-medium text-foreground">Improvement (pp)</p>
-                    <p className="text-xs">Percentage points gained over base model (e.g., +1.02 pp = 1.02% improvement). Green text indicates positive improvement, red indicates regression.</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Sorting Explanation */}
-              <div className="space-y-2">
-                <div className="flex items-start gap-2">
-                  <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-foreground">Column Sorting</p>
-                    <p className="text-xs">For each benchmark, click "Acc" to sort by accuracy or "Imp" to sort by improvement over base model. Gray buttons indicate that sorting mode is inactive.</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Traces Legend */}
-              <div className="space-y-2">
-                <div className="flex items-start gap-2">
-                  <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <p className="font-medium text-foreground">Trace Links</p>
-                </div>
-                <div className="flex items-center gap-4 text-xs ml-6">
+                {/* Duplicate Display Controls */}
+                <div className="flex items-center gap-6">
                   <div className="flex items-center gap-2">
-                    <div className="inline-flex items-center justify-center w-5 h-5 rounded border-2 border-primary bg-primary/10">
-                      <ExternalLink className="w-3 h-3 text-primary" />
+                    <Checkbox
+                      id={`show-duplicate-benchmarks-${tabValue}`}
+                      checked={showDuplicateBenchmarks}
+                      onCheckedChange={(checked) => setShowDuplicateBenchmarks(checked === true)}
+                    />
+                    <label
+                      htmlFor={`show-duplicate-benchmarks-${tabValue}`}
+                      className="text-sm text-muted-foreground cursor-pointer select-none"
+                    >
+                      Show duplicate benchmarks
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id={`show-duplicate-models-${tabValue}`}
+                      checked={showDuplicateModels}
+                      onCheckedChange={(checked) => setShowDuplicateModels(checked === true)}
+                    />
+                    <label
+                      htmlFor={`show-duplicate-models-${tabValue}`}
+                      className="text-sm text-muted-foreground cursor-pointer select-none"
+                    >
+                      Show duplicate models
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id={`hide-no-trace-link-${tabValue}`}
+                      checked={hideNoTraceLink}
+                      onCheckedChange={(checked) => setHideNoTraceLink(checked === true)}
+                    />
+                    <label
+                      htmlFor={`hide-no-trace-link-${tabValue}`}
+                      className="text-sm text-muted-foreground cursor-pointer select-none"
+                    >
+                      Hide evals with no trace link
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 px-3 py-3 bg-muted/30 rounded-md text-sm text-muted-foreground">
+                {/* Row Highlighting */}
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-foreground">Row Highlighting</p>
+                      <p className="text-xs">
+                        <span className="inline-block w-3 h-3 rounded bg-blue-100 dark:bg-blue-900/60 border mr-1 align-middle" /> Base models (no base model).{' '}
+                        <span className="inline-block w-3 h-3 rounded bg-neutral-200 dark:bg-neutral-800/70 border mr-1 align-middle" /> Blacklisted models.
+                      </p>
                     </div>
-                    <span>Available</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="inline-flex items-center justify-center w-5 h-5 rounded border border-muted-foreground/20 bg-muted/50">
-                      <ExternalLink className="w-3 h-3 text-muted-foreground/40" />
+                </div>
+
+                {/* Metrics Explanation */}
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-foreground">Standard Error (±)</p>
+                      <p className="text-xs">Calculated over 3 runs. Shows variability in model performance.</p>
                     </div>
-                    <span>Unavailable</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="inline-flex items-center justify-center w-5 h-5 rounded border border-red-500/50 bg-red-500/10">
-                      <AlertCircle className="w-3 h-3 text-red-500" />
+                  <div className="flex items-start gap-2 ml-6">
+                    <div className="w-4 h-4" />
+                    <div>
+                      <p className="font-medium text-foreground">Improvement (pp)</p>
+                      <p className="text-xs">Percentage points gained over base model (e.g., +1.02 pp = 1.02% improvement). Green text indicates positive improvement, red indicates regression.</p>
                     </div>
-                    <span>Missing</span>
+                  </div>
+                </div>
+
+                {/* Sorting Explanation */}
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-foreground">Column Sorting</p>
+                      <p className="text-xs">For each benchmark, click "Acc" to sort by accuracy or "Imp" to sort by improvement over base model. Gray buttons indicate that sorting mode is inactive.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Traces Legend */}
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <p className="font-medium text-foreground">Trace Links</p>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs ml-6">
+                    <div className="flex items-center gap-2">
+                      <div className="inline-flex items-center justify-center w-5 h-5 rounded border-2 border-primary bg-primary/10">
+                        <ExternalLink className="w-3 h-3 text-primary" />
+                      </div>
+                      <span>Available</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="inline-flex items-center justify-center w-5 h-5 rounded border border-muted-foreground/20 bg-muted/50">
+                        <ExternalLink className="w-3 h-3 text-muted-foreground/40" />
+                      </div>
+                      <span>Unavailable</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="inline-flex items-center justify-center w-5 h-5 rounded border border-red-500/50 bg-red-500/10">
+                        <AlertCircle className="w-3 h-3 text-red-500" />
+                      </div>
+                      <span>Missing</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Timestamp Columns Legend */}
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-foreground">Timestamp Columns</p>
+                      <p className="text-xs"><strong>First Eval Ended At:</strong> The earliest evaluation completion time across all benchmarks for this model+agent combination.</p>
+                      <p className="text-xs mt-1"><strong>Latest Eval Ended At:</strong> The most recent evaluation completion time across all benchmarks for this model+agent combination.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Result Selection */}
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-foreground">Result Selection ({selectionMode.charAt(0).toUpperCase() + selectionMode.slice(1)} mode)</p>
+                      <p className="text-xs">
+                        {SELECTION_MODE_DESCRIPTIONS[selectionMode]}
+                        {' '}Results from equivalent benchmarks (canonical + duplicates) are merged into one pool before selection.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Config Metadata Badges */}
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-foreground">Config Metadata Badges</p>
+                      <p className="text-xs">Each benchmark cell displays configuration badges indicating the evaluation environment settings.</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-4 text-xs ml-6">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[10px] rounded-full px-2 py-0.5 border bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/25">T:2x</span>
+                      <span>Timeout multiplier (e.g. 2x = double the default timeout)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[10px] rounded-full px-2 py-0.5 border bg-muted/50 text-muted-foreground/50 border-muted-foreground/20">T:N/A</span>
+                      <span>Default timeout (not configured / not found)</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-4 text-xs ml-6">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[10px] rounded-full px-2 py-0.5 border bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/25">D:4/8/32</span>
+                      <span>Daytona sandbox overrides: CPUs / Memory (GB) / Storage (GB)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[10px] rounded-full px-2 py-0.5 border bg-muted/50 text-muted-foreground/50 border-muted-foreground/20">D:?/?/?</span>
+                      <span>Default sandbox config (not configured / not found)</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Timestamp Columns Legend */}
-              <div className="space-y-2">
-                <div className="flex items-start gap-2">
-                  <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-foreground">Timestamp Columns</p>
-                    <p className="text-xs"><strong>First Eval Ended At:</strong> The earliest evaluation completion time across all benchmarks for this model+agent combination.</p>
-                    <p className="text-xs mt-1"><strong>Latest Eval Ended At:</strong> The most recent evaluation completion time across all benchmarks for this model+agent combination.</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Result Selection */}
-              <div className="space-y-2">
-                <div className="flex items-start gap-2">
-                  <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-foreground">Result Selection ({selectionMode.charAt(0).toUpperCase() + selectionMode.slice(1)} mode)</p>
-                    <p className="text-xs">
-                      {SELECTION_MODE_DESCRIPTIONS[selectionMode]}
-                      {' '}Results from equivalent benchmarks (canonical + duplicates) are merged into one pool before selection.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Config Metadata Badges */}
-              <div className="space-y-2">
-                <div className="flex items-start gap-2">
-                  <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-foreground">Config Metadata Badges</p>
-                    <p className="text-xs">Each benchmark cell displays configuration badges indicating the evaluation environment settings.</p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-4 text-xs ml-6">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-[10px] rounded-full px-2 py-0.5 border bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/25">T:2x</span>
-                    <span>Timeout multiplier (e.g. 2x = double the default timeout)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-[10px] rounded-full px-2 py-0.5 border bg-muted/50 text-muted-foreground/50 border-muted-foreground/20">T:N/A</span>
-                    <span>Default timeout (not configured / not found)</span>
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-4 text-xs ml-6">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-[10px] rounded-full px-2 py-0.5 border bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/25">D:4/8/32</span>
-                    <span>Daytona sandbox overrides: CPUs / Memory (GB) / Storage (GB)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-[10px] rounded-full px-2 py-0.5 border bg-muted/50 text-muted-foreground/50 border-muted-foreground/20">D:?/?/?</span>
-                    <span>Default sandbox config (not configured / not found)</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Table */}
-            <LeaderboardTableWithImprovement
-              data={pivotedData}
-              modelSearch={modelSearch}
-              agentSearch={agentSearch}
-              baseModelSearch={baseModelSearch}
-              benchmarkSearch={benchmarkSearch}
-              filters={{
-                models: selectedModels,
-                agents: selectedAgents,
-                trainingAgents: selectedTrainingAgents,
-                baseModels: selectedBaseModels,
-                benchmarks: selectedBenchmarks,
-              }}
-              showDuplicateBenchmarks={showDuplicateBenchmarks}
-              showDuplicateModels={showDuplicateModels}
-            />
-          </TabsContent>
+              {/* Table */}
+              <LeaderboardTableWithImprovement
+                data={tabFilteredData}
+                modelSearch={modelSearch}
+                agentSearch={agentSearch}
+                baseModelSearch={baseModelSearch}
+                benchmarkSearch={benchmarkSearch}
+                filters={{
+                  models: selectedModels,
+                  agents: selectedAgents,
+                  trainingAgents: selectedTrainingAgents,
+                  baseModels: selectedBaseModels,
+                  benchmarks: selectedBenchmarks,
+                }}
+                showDuplicateBenchmarks={showDuplicateBenchmarks}
+                showDuplicateModels={showDuplicateModels}
+              />
+            </TabsContent>
+          ))}
         </Tabs>
       </main>
     </div>
