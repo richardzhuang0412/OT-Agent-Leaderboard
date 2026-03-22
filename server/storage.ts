@@ -37,8 +37,12 @@ export interface BenchmarkResultWithImprovement extends BenchmarkResultExtended 
   daytonaOverrideCpus?: number;
   daytonaOverrideMemoryMb?: number;
   daytonaOverrideStorageMb?: number;
+  // Auto snapshot
+  autoSnapshot?: boolean;
   // Training type
   trainingType?: string;
+  // Model size
+  modelSizeB?: number;
   // Job status for progress tracking
   jobStatus: string | null;
   username: string | null;
@@ -57,6 +61,7 @@ export interface ModelInfo {
   canonicalBaseModelName: string;
   creationTime: string | null;
   trainingType: string | null;
+  modelSizeB: number | null;
 }
 
 // Raw row from the leaderboard_results view (all results, no deduplication)
@@ -85,6 +90,7 @@ interface RawLeaderboardRow {
   canonical_base_model_id: string | null;
   config: any;
   training_type: string | null;
+  model_size_b: number | null;
   job_status: string | null;
   username: string | null;
 }
@@ -151,7 +157,12 @@ function selectResult(pool: RawLeaderboardRow[], mode: EvalSelectionMode): RawLe
 function formatTimestampField(ts: string | null): string | undefined {
   if (!ts) return undefined;
   const d = new Date(ts);
-  return d.toISOString().split('T')[0] + ' ' + d.toTimeString().split(' ')[0];
+  return d.toLocaleString('en-CA', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  }).replace(',', '');
 }
 
 export interface IStorage {
@@ -257,12 +268,17 @@ export class DbStorage implements IStorage {
       //    (same as #3 since benchmark_name is already canonical)
       const canonicalBothBaseModelAccuracy = canonicalBaseModelAccuracy;
 
-      // Extract config fields
-      const config = selected.config;
+      // Extract config fields (handle both parsed object and string JSONB)
+      let config = selected.config;
+      if (typeof config === 'string') {
+        try { config = JSON.parse(config); } catch { config = undefined; }
+      }
       const timeoutMultiplier = config?.timeout_multiplier ?? undefined;
       const daytonaOverrideCpus = config?.environment?.override_cpus ?? undefined;
       const daytonaOverrideMemoryMb = config?.environment?.override_memory_mb ?? undefined;
       const daytonaOverrideStorageMb = config?.environment?.override_storage_mb ?? undefined;
+      const autoSnapshotVal = config?.environment?.kwargs?.auto_snapshot;
+      const autoSnapshot = autoSnapshotVal === true || autoSnapshotVal === 'true';
 
       results.push({
         id: selected.id,
@@ -294,7 +310,9 @@ export class DbStorage implements IStorage {
         daytonaOverrideCpus,
         daytonaOverrideMemoryMb,
         daytonaOverrideStorageMb,
+        autoSnapshot,
         trainingType: selected.training_type ?? undefined,
+        modelSizeB: selected.model_size_b ?? undefined,
         jobStatus: selected.job_status ?? null,
         username: selected.username ?? null,
       });
@@ -331,7 +349,7 @@ export class DbStorage implements IStorage {
     // due to unnamed constraint + multiple self-referencing FKs on models table
     const { data: modelsData, error: modelsError } = await supabase
       .from('models')
-      .select('id, name, agent_id, base_model_id, duplicate_of, creation_time, training_type');
+      .select('id, name, agent_id, base_model_id, duplicate_of, creation_time, training_type, model_size_b');
 
     if (modelsError) {
       console.error('Error fetching models:', modelsError);
@@ -394,6 +412,7 @@ export class DbStorage implements IStorage {
           canonicalBaseModelName,
           creationTime: row.creation_time ?? null,
           trainingType: row.training_type ?? null,
+          modelSizeB: row.model_size_b ?? null,
         };
       });
   }

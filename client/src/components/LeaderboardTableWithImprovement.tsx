@@ -26,6 +26,8 @@ export interface PivotedLeaderboardRowWithImprovement {
   baseModelName: string;
   // Training type
   trainingType?: string;
+  // Model size in billions
+  modelSizeB?: number;
   // Duplicate tracking fields
   modelDuplicateOf: string | null;
   canonicalModelName: string;
@@ -51,6 +53,7 @@ export interface PivotedLeaderboardRowWithImprovement {
     daytonaOverrideCpus?: number;
     daytonaOverrideMemoryMb?: number;
     daytonaOverrideStorageMb?: number;
+    autoSnapshot?: boolean;
     // Job status for progress tracking
     jobStatus?: string | null;
     username?: string | null;
@@ -69,6 +72,8 @@ interface LeaderboardTableWithImprovementProps {
     trainingAgents: string[];
     baseModels: string[];
     benchmarks: string[];
+    trainingTypes: string[];
+    modelSizes: string[];
   };
   // Duplicate display controls
   showDuplicateBenchmarks: boolean;
@@ -78,6 +83,25 @@ interface LeaderboardTableWithImprovementProps {
 type SortField = 'modelName' | 'agentName' | 'baseModelName' | 'trainingType' | 'modelCreatedAt' | 'firstEvalEndedAt' | 'latestEvalEndedAt' | string; // string for dynamic benchmark names
 type SortDirection = 'asc' | 'desc' | null;
 type SortMode = 'accuracy' | 'improvement';
+
+function formatModelSize(sizeB: number): string {
+  return `${Math.floor(sizeB)}B`;
+}
+
+function modelSizeColor(sizeB: number): string {
+  const s = Math.floor(sizeB);
+  switch (s) {
+    case 8: return 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300';
+    case 32: return 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300';
+    case 4: return 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300';
+    case 14: return 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300';
+    case 7: return 'bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300';
+    case 72: return 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300';
+    case 30: return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300';
+    case 2: return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300';
+    default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
+  }
+}
 
 export default function LeaderboardTableWithImprovement({
   data,
@@ -375,6 +399,19 @@ export default function LeaderboardTableWithImprovement({
       filtered = filtered.filter(row => filters.baseModels.includes(row.baseModelName));
     }
 
+    // Filter by training type filters
+    if (filters.trainingTypes.length > 0) {
+      filtered = filtered.filter(row => filters.trainingTypes.includes(row.trainingType || 'None'));
+    }
+
+    // Filter by model size filters
+    if (filters.modelSizes.length > 0) {
+      filtered = filtered.filter(row => {
+        const sizeLabel = row.modelSizeB != null ? `${Math.floor(row.modelSizeB)}B` : 'Unknown';
+        return filters.modelSizes.includes(sizeLabel);
+      });
+    }
+
     // Sort the data
     if (sortDirection && sortField) {
       filtered = [...filtered].sort((a, b) => {
@@ -520,6 +557,7 @@ export default function LeaderboardTableWithImprovement({
       daytonaOverrideCpus?: number;
       daytonaOverrideMemoryMb?: number;
       daytonaOverrideStorageMb?: number;
+      autoSnapshot?: boolean;
       jobStatus?: string | null;
       username?: string | null;
     },
@@ -542,23 +580,6 @@ export default function LeaderboardTableWithImprovement({
 
       return (
         <div className="flex items-center gap-2 justify-end">
-          {/* Config metadata badges — stacked vertically */}
-          <div className="flex flex-col gap-1 items-start">
-            <span className={`font-mono text-[10px] rounded-full px-2 py-0.5 border ${
-              benchmarkData.timeoutMultiplier != null
-                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/25'
-                : 'bg-muted/50 text-muted-foreground/50 border-muted-foreground/20'
-            }`}>
-              T:{benchmarkData.timeoutMultiplier != null ? `${benchmarkData.timeoutMultiplier}x` : 'N/A'}
-            </span>
-            <span className={`font-mono text-[10px] rounded-full px-2 py-0.5 border ${
-              (benchmarkData.daytonaOverrideCpus != null || benchmarkData.daytonaOverrideMemoryMb != null || benchmarkData.daytonaOverrideStorageMb != null)
-                ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/25'
-                : 'bg-muted/50 text-muted-foreground/50 border-muted-foreground/20'
-            }`}>
-              D:{benchmarkData.daytonaOverrideCpus ?? '?'}/{benchmarkData.daytonaOverrideMemoryMb != null ? (benchmarkData.daytonaOverrideMemoryMb / 1024).toFixed(0) : '?'}/{benchmarkData.daytonaOverrideStorageMb != null ? (benchmarkData.daytonaOverrideStorageMb / 1024).toFixed(0) : '?'}
-            </span>
-          </div>
           {/* Status badge */}
           <div className="flex flex-col items-end gap-1">
             <span
@@ -610,7 +631,7 @@ export default function LeaderboardTableWithImprovement({
           </div>
         )}
         {/* Config metadata badges — stacked vertically in the middle */}
-        <div className="flex flex-col gap-1 items-start">
+        <div className="flex flex-col gap-1 items-start w-[5.5rem]">
           <span className={`font-mono text-[10px] rounded-full px-2 py-0.5 border ${
             benchmarkData.timeoutMultiplier != null
               ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/25'
@@ -618,12 +639,18 @@ export default function LeaderboardTableWithImprovement({
           }`}>
             T:{benchmarkData.timeoutMultiplier != null ? `${benchmarkData.timeoutMultiplier}x` : 'N/A'}
           </span>
-          <span className={`font-mono text-[10px] rounded-full px-2 py-0.5 border ${
-            (benchmarkData.daytonaOverrideCpus != null || benchmarkData.daytonaOverrideMemoryMb != null || benchmarkData.daytonaOverrideStorageMb != null)
-              ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/25'
-              : 'bg-muted/50 text-muted-foreground/50 border-muted-foreground/20'
+          <span className={`font-mono text-[10px] rounded-full px-2 py-0.5 border whitespace-nowrap ${
+            benchmarkData.autoSnapshot
+              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25'
+              : (benchmarkData.daytonaOverrideCpus != null || benchmarkData.daytonaOverrideMemoryMb != null || benchmarkData.daytonaOverrideStorageMb != null)
+                ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/25'
+                : 'bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/25'
           }`}>
-            D:{benchmarkData.daytonaOverrideCpus ?? '?'}/{benchmarkData.daytonaOverrideMemoryMb != null ? (benchmarkData.daytonaOverrideMemoryMb / 1024).toFixed(0) : '?'}/{benchmarkData.daytonaOverrideStorageMb != null ? (benchmarkData.daytonaOverrideStorageMb / 1024).toFixed(0) : '?'}
+            {benchmarkData.autoSnapshot
+              ? 'D: Snapshot'
+              : (benchmarkData.daytonaOverrideCpus != null || benchmarkData.daytonaOverrideMemoryMb != null || benchmarkData.daytonaOverrideStorageMb != null)
+                ? `D: ${benchmarkData.daytonaOverrideCpus ?? 'x'}/${benchmarkData.daytonaOverrideMemoryMb != null ? (benchmarkData.daytonaOverrideMemoryMb / 1024).toFixed(0) : 'x'}/${benchmarkData.daytonaOverrideStorageMb != null ? (benchmarkData.daytonaOverrideStorageMb / 1024).toFixed(0) : 'x'}`
+                : 'D: Default'}
           </span>
         </div>
         {/* Numbers column — right-aligned */}
@@ -761,7 +788,7 @@ export default function LeaderboardTableWithImprovement({
                     className="flex items-center gap-2 font-medium text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-2 px-2 py-1 rounded-md"
                     data-testid="button-sort-modelCreatedAt"
                   >
-                    Model Added At
+                    Model Added At (PT)
                     <SortIcon field="modelCreatedAt" />
                   </button>
                 </th>
@@ -771,7 +798,7 @@ export default function LeaderboardTableWithImprovement({
                     className="flex items-center gap-2 font-medium text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-2 px-2 py-1 rounded-md"
                     data-testid="button-sort-firstEvalEndedAt"
                   >
-                    First Eval Ended At
+                    First Eval At (PT)
                     <SortIcon field="firstEvalEndedAt" />
                   </button>
                 </th>
@@ -781,7 +808,7 @@ export default function LeaderboardTableWithImprovement({
                     className="flex items-center gap-2 font-medium text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-2 px-2 py-1 rounded-md"
                     data-testid="button-sort-latestEvalEndedAt"
                   >
-                    Latest Eval Ended At
+                    Latest Eval At (PT)
                     <SortIcon field="latestEvalEndedAt" />
                   </button>
                 </th>
@@ -817,6 +844,20 @@ export default function LeaderboardTableWithImprovement({
                     >
                       <td className={`px-6 py-4 sticky left-0 z-20 ${stickyCellBgClass}`}>
                         <span className="font-semibold text-foreground">{row.modelName}</span>
+                        {row.modelSizeB != null && (
+                          <span className={`ml-2 text-xs px-1.5 py-0.5 rounded font-mono font-medium ${modelSizeColor(row.modelSizeB)}`}>
+                            {formatModelSize(row.modelSizeB)}
+                          </span>
+                        )}
+                        <span className={`ml-1 text-xs px-1.5 py-0.5 rounded font-medium ${
+                          row.trainingType === 'SFT'
+                            ? 'bg-lime-100 text-lime-800 dark:bg-lime-900 dark:text-lime-200'
+                            : row.trainingType === 'RL'
+                              ? 'bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200'
+                              : 'bg-stone-200 text-stone-700 dark:bg-stone-700 dark:text-stone-200'
+                        }`}>
+                          {row.trainingType || 'Base'}
+                        </span>
                       </td>
                     <td className="px-6 py-4">
                       {row.isNoEval ? (

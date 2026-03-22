@@ -69,6 +69,7 @@ SELECT
   -- Eval config and training type metadata
   aj.config as config,
   m.training_type as training_type,
+  m.model_size_b as model_size_b,
   -- Job status and user info for progress tracking
   aj.job_status::text as job_status,
   aj.username as username
