@@ -218,12 +218,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const formatTimestamp = (ts: string) => {
         const d = new Date(ts);
-        return d.toLocaleString('en-CA', {
+        if (isNaN(d.getTime())) return ts;
+        const formatted = d.toLocaleString('en-CA', {
           timeZone: 'America/Los_Angeles',
           year: 'numeric', month: '2-digit', day: '2-digit',
           hour: '2-digit', minute: '2-digit', second: '2-digit',
           hour12: false,
         }).replace(',', '');
+        return formatted.replace(/\b24:/, '00:');
       };
 
       // Build modelId → trainingAgentName, modelId → creationTime, modelId → trainingType lookups

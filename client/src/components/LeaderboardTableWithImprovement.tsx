@@ -431,14 +431,20 @@ export default function LeaderboardTableWithImprovement({
           aVal = a.trainingType || '';
           bVal = b.trainingType || '';
         } else if (sortField === 'modelCreatedAt') {
-          aVal = a.modelCreatedAt ? new Date(a.modelCreatedAt) : undefined;
-          bVal = b.modelCreatedAt ? new Date(b.modelCreatedAt) : undefined;
+          const ad = a.modelCreatedAt ? new Date(a.modelCreatedAt) : undefined;
+          const bd = b.modelCreatedAt ? new Date(b.modelCreatedAt) : undefined;
+          aVal = ad && !isNaN(ad.getTime()) ? ad : undefined;
+          bVal = bd && !isNaN(bd.getTime()) ? bd : undefined;
         } else if (sortField === 'firstEvalEndedAt') {
-          aVal = a.firstEvalEndedAt ? new Date(a.firstEvalEndedAt) : undefined;
-          bVal = b.firstEvalEndedAt ? new Date(b.firstEvalEndedAt) : undefined;
+          const ad = a.firstEvalEndedAt ? new Date(a.firstEvalEndedAt) : undefined;
+          const bd = b.firstEvalEndedAt ? new Date(b.firstEvalEndedAt) : undefined;
+          aVal = ad && !isNaN(ad.getTime()) ? ad : undefined;
+          bVal = bd && !isNaN(bd.getTime()) ? bd : undefined;
         } else if (sortField === 'latestEvalEndedAt') {
-          aVal = a.latestEvalEndedAt ? new Date(a.latestEvalEndedAt) : undefined;
-          bVal = b.latestEvalEndedAt ? new Date(b.latestEvalEndedAt) : undefined;
+          const ad = a.latestEvalEndedAt ? new Date(a.latestEvalEndedAt) : undefined;
+          const bd = b.latestEvalEndedAt ? new Date(b.latestEvalEndedAt) : undefined;
+          aVal = ad && !isNaN(ad.getTime()) ? ad : undefined;
+          bVal = bd && !isNaN(bd.getTime()) ? bd : undefined;
         } else {
           // Sorting by a benchmark column
           const sortMode = sortModePerBenchmark[sortField] || 'accuracy';

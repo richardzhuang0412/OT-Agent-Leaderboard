@@ -199,15 +199,20 @@ export default function Leaderboard() {
       .slice(0, topN === Number.MAX_SAFE_INTEGER ? undefined : topN);
 
     // N Most Recently Added — sort by modelCreatedAt only
-    const dataWithCreatedAt = pivotedData.filter(row => row.modelCreatedAt && row.modelCreatedAt !== '—');
+    const safeDateMs = (s: string | undefined) => {
+      if (!s || s === '—') return NaN;
+      const t = new Date(s).getTime();
+      return isNaN(t) ? -Infinity : t;
+    };
+    const dataWithCreatedAt = pivotedData.filter(row => row.modelCreatedAt && row.modelCreatedAt !== '—' && !isNaN(new Date(row.modelCreatedAt).getTime()));
     const mostRecentlyAdded = [...dataWithCreatedAt]
-      .sort((a, b) => new Date(b.modelCreatedAt!).getTime() - new Date(a.modelCreatedAt!).getTime())
+      .sort((a, b) => safeDateMs(b.modelCreatedAt) - safeDateMs(a.modelCreatedAt))
       .slice(0, recentlyAddedN === Number.MAX_SAFE_INTEGER ? undefined : recentlyAddedN);
 
     // N Most Recently Evaluated — sort by latestEvalEndedAt only (no fallback)
-    const dataWithEvalAt = pivotedData.filter(row => row.latestEvalEndedAt && row.latestEvalEndedAt !== '—');
+    const dataWithEvalAt = pivotedData.filter(row => row.latestEvalEndedAt && row.latestEvalEndedAt !== '—' && !isNaN(new Date(row.latestEvalEndedAt).getTime()));
     const mostRecentlyEvaled = [...dataWithEvalAt]
-      .sort((a, b) => new Date(b.latestEvalEndedAt!).getTime() - new Date(a.latestEvalEndedAt!).getTime())
+      .sort((a, b) => safeDateMs(b.latestEvalEndedAt) - safeDateMs(a.latestEvalEndedAt))
       .slice(0, recentlyEvaledN === Number.MAX_SAFE_INTEGER ? undefined : recentlyEvaledN);
 
     // Union: Remove duplicates using Map
