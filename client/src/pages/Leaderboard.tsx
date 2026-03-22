@@ -40,6 +40,8 @@ export default function Leaderboard() {
   const [selectedTrainingAgents, setSelectedTrainingAgents] = useState<string[]>([]);
   const [selectedBaseModels, setSelectedBaseModels] = useState<string[]>([]);
   const [selectedBenchmarks, setSelectedBenchmarks] = useState<string[]>([]);
+  const [selectedTrainingTypes, setSelectedTrainingTypes] = useState<string[]>([]);
+  const [selectedModelSizes, setSelectedModelSizes] = useState<string[]>([]);
   // Duplicate display controls (default: hide duplicates)
   const [showDuplicateBenchmarks, setShowDuplicateBenchmarks] = useState(false);
   const [showDuplicateModels, setShowDuplicateModels] = useState(false);
@@ -87,6 +89,24 @@ export default function Leaderboard() {
       pivotedData.map((item) => item[field]).filter(Boolean)
     )).sort();
   }, [pivotedData, showDuplicateModels]);
+
+  const availableTrainingTypes = useMemo(() => {
+    return Array.from(new Set(
+      pivotedData.map((item) => item.trainingType || 'None')
+    )).sort();
+  }, [pivotedData]);
+
+  const availableModelSizes = useMemo(() => {
+    const sizes = new Set<string>();
+    pivotedData.forEach((item) => {
+      sizes.add(item.modelSizeB != null ? `${Math.floor(item.modelSizeB)}B` : 'Unknown');
+    });
+    return Array.from(sizes).sort((a, b) => {
+      if (a === 'Unknown') return 1;
+      if (b === 'Unknown') return -1;
+      return parseInt(a) - parseInt(b);
+    });
+  }, [pivotedData]);
 
   const availableBenchmarks = useMemo(() => {
     const benchmarkSet = new Set<string>();
@@ -243,6 +263,8 @@ export default function Leaderboard() {
     setSelectedTrainingAgents([]);
     setSelectedBaseModels([]);
     setSelectedBenchmarks([]);
+    setSelectedTrainingTypes([]);
+    setSelectedModelSizes([]);
   };
 
   const handleResetFilters = () => {
@@ -250,6 +272,8 @@ export default function Leaderboard() {
     setSelectedAgents([]);
     setSelectedTrainingAgents([]);
     setSelectedBaseModels([]);
+    setSelectedTrainingTypes([]);
+    setSelectedModelSizes([]);
     const validDefaults = DEFAULT_VISIBLE_BENCHMARKS.filter(benchmark =>
       availableBenchmarks.includes(benchmark)
     );
@@ -362,16 +386,22 @@ export default function Leaderboard() {
               availableTrainingAgents={availableTrainingAgents}
               availableBaseModels={availableBaseModels}
               availableBenchmarks={availableBenchmarks}
+              availableTrainingTypes={availableTrainingTypes}
+              availableModelSizes={availableModelSizes}
               selectedModels={selectedModels}
               selectedAgents={selectedAgents}
               selectedTrainingAgents={selectedTrainingAgents}
               selectedBaseModels={selectedBaseModels}
               selectedBenchmarks={selectedBenchmarks}
+              selectedTrainingTypes={selectedTrainingTypes}
+              selectedModelSizes={selectedModelSizes}
               onModelsChange={setSelectedModels}
               onAgentsChange={setSelectedAgents}
               onTrainingAgentsChange={setSelectedTrainingAgents}
               onBaseModelsChange={setSelectedBaseModels}
               onBenchmarksChange={setSelectedBenchmarks}
+              onTrainingTypesChange={setSelectedTrainingTypes}
+              onModelSizesChange={setSelectedModelSizes}
               onClearAll={handleClearFilters}
               onReset={handleResetFilters}
             />
@@ -497,9 +527,11 @@ export default function Leaderboard() {
               <div className="flex items-start gap-2">
                 <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-medium text-foreground">Timestamp Columns</p>
-                  <p className="text-xs"><strong>First Eval Ended At:</strong> The earliest evaluation completion time across all benchmarks for this model+agent combination.</p>
-                  <p className="text-xs mt-1"><strong>Latest Eval Ended At:</strong> The most recent evaluation completion time across all benchmarks for this model+agent combination.</p>
+                  <p className="font-medium text-foreground">Timestamp Columns (Pacific Time)</p>
+                  <p className="text-xs">All timestamps are displayed in Pacific Time (PST/PDT, America/Los_Angeles).</p>
+                  <p className="text-xs mt-1"><strong>Model Added At:</strong> When the model was registered in the database.</p>
+                  <p className="text-xs mt-1"><strong>First Eval At:</strong> The earliest evaluation completion time across all benchmarks for this model+agent combination.</p>
+                  <p className="text-xs mt-1"><strong>Latest Eval At:</strong> The most recent evaluation completion time across all benchmarks for this model+agent combination.</p>
                 </div>
               </div>
             </div>
@@ -524,27 +556,31 @@ export default function Leaderboard() {
                 <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="font-medium text-foreground">Config Metadata Badges</p>
-                  <p className="text-xs">Each benchmark cell displays configuration badges indicating the evaluation environment settings.</p>
+                  <p className="text-xs">Each benchmark cell displays configuration badges indicating the evaluation environment settings. Badges are only shown for finished evaluations.</p>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-4 text-xs ml-6">
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-[10px] rounded-full px-2 py-0.5 border bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/25">T:2x</span>
-                  <span>Timeout multiplier (e.g. 2x = double the default timeout)</span>
+                  <span>Timeout multiplier (e.g., 2x = double the default timeout)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-[10px] rounded-full px-2 py-0.5 border bg-muted/50 text-muted-foreground/50 border-muted-foreground/20">T:N/A</span>
-                  <span>Default timeout (not configured / not found)</span>
+                  <span>Timeout not configured</span>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-4 text-xs ml-6">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-[10px] rounded-full px-2 py-0.5 border bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/25">D:4/8/32</span>
-                  <span>Daytona sandbox overrides: CPUs / Memory (GB) / Storage (GB)</span>
+                  <span className="font-mono text-[10px] rounded-full px-2 py-0.5 border whitespace-nowrap bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25">D: Snapshot</span>
+                  <span>Daytona sandbox with auto-snapshot enabled</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-[10px] rounded-full px-2 py-0.5 border bg-muted/50 text-muted-foreground/50 border-muted-foreground/20">D:?/?/?</span>
-                  <span>Default sandbox config (not configured / not found)</span>
+                  <span className="font-mono text-[10px] rounded-full px-2 py-0.5 border bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/25">D: 4/8/32</span>
+                  <span>Daytona sandbox overrides: CPUs / Memory (GB) / Storage (GB). "x" = not overridden</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[10px] rounded-full px-2 py-0.5 border whitespace-nowrap bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/25">D: Default</span>
+                  <span>Default Daytona sandbox config (no overrides, no snapshot)</span>
                 </div>
               </div>
             </div>
@@ -564,6 +600,8 @@ export default function Leaderboard() {
                 trainingAgents: selectedTrainingAgents,
                 baseModels: selectedBaseModels,
                 benchmarks: selectedBenchmarks,
+                trainingTypes: selectedTrainingTypes,
+                modelSizes: selectedModelSizes,
               }}
               showDuplicateBenchmarks={showDuplicateBenchmarks}
               showDuplicateModels={showDuplicateModels}
@@ -593,16 +631,22 @@ export default function Leaderboard() {
                   availableTrainingAgents={availableTrainingAgents}
                   availableBaseModels={availableBaseModels}
                   availableBenchmarks={availableBenchmarks}
+                  availableTrainingTypes={availableTrainingTypes}
+                  availableModelSizes={availableModelSizes}
                   selectedModels={selectedModels}
                   selectedAgents={selectedAgents}
                   selectedTrainingAgents={selectedTrainingAgents}
                   selectedBaseModels={selectedBaseModels}
                   selectedBenchmarks={selectedBenchmarks}
+                  selectedTrainingTypes={selectedTrainingTypes}
+                  selectedModelSizes={selectedModelSizes}
                   onModelsChange={setSelectedModels}
                   onAgentsChange={setSelectedAgents}
                   onTrainingAgentsChange={setSelectedTrainingAgents}
                   onBaseModelsChange={setSelectedBaseModels}
                   onBenchmarksChange={setSelectedBenchmarks}
+                  onTrainingTypesChange={setSelectedTrainingTypes}
+                  onModelSizesChange={setSelectedModelSizes}
                   onClearAll={handleClearFilters}
                   onReset={handleResetFilters}
                 />
@@ -794,6 +838,8 @@ export default function Leaderboard() {
                   trainingAgents: selectedTrainingAgents,
                   baseModels: selectedBaseModels,
                   benchmarks: selectedBenchmarks,
+                  trainingTypes: selectedTrainingTypes,
+                  modelSizes: selectedModelSizes,
                 }}
                 showDuplicateBenchmarks={showDuplicateBenchmarks}
                 showDuplicateModels={showDuplicateModels}

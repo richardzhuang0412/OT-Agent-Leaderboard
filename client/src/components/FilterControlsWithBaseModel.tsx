@@ -18,16 +18,22 @@ interface FilterControlsWithBaseModelProps {
   availableTrainingAgents: string[];
   availableBaseModels: string[];
   availableBenchmarks: string[];
+  availableTrainingTypes: string[];
+  availableModelSizes: string[];
   selectedModels: string[];
   selectedAgents: string[];
   selectedTrainingAgents: string[];
   selectedBaseModels: string[];
   selectedBenchmarks: string[];
+  selectedTrainingTypes: string[];
+  selectedModelSizes: string[];
   onModelsChange: (models: string[]) => void;
   onAgentsChange: (agents: string[]) => void;
   onTrainingAgentsChange: (agents: string[]) => void;
   onBaseModelsChange: (baseModels: string[]) => void;
   onBenchmarksChange: (benchmarks: string[]) => void;
+  onTrainingTypesChange: (trainingTypes: string[]) => void;
+  onModelSizesChange: (modelSizes: string[]) => void;
   onClearAll: () => void;
   onReset: () => void;
 }
@@ -39,16 +45,22 @@ export default function FilterControlsWithBaseModel({
   availableTrainingAgents,
   availableBaseModels,
   availableBenchmarks,
+  availableTrainingTypes,
+  availableModelSizes,
   selectedModels,
   selectedAgents,
   selectedTrainingAgents,
   selectedBaseModels,
   selectedBenchmarks,
+  selectedTrainingTypes,
+  selectedModelSizes,
   onModelsChange,
   onAgentsChange,
   onTrainingAgentsChange,
   onBaseModelsChange,
   onBenchmarksChange,
+  onTrainingTypesChange,
+  onModelSizesChange,
   onClearAll,
   onReset,
 }: FilterControlsWithBaseModelProps) {
@@ -113,7 +125,23 @@ export default function FilterControlsWithBaseModel({
     }
   };
 
-  const totalFilters = selectedModels.length + selectedAgents.length + selectedTrainingAgents.length + selectedBaseModels.length + selectedBenchmarks.length;
+  const toggleTrainingType = (trainingType: string) => {
+    if (selectedTrainingTypes.includes(trainingType)) {
+      onTrainingTypesChange(selectedTrainingTypes.filter((t) => t !== trainingType));
+    } else {
+      onTrainingTypesChange([...selectedTrainingTypes, trainingType]);
+    }
+  };
+
+  const toggleModelSize = (modelSize: string) => {
+    if (selectedModelSizes.includes(modelSize)) {
+      onModelSizesChange(selectedModelSizes.filter((s) => s !== modelSize));
+    } else {
+      onModelSizesChange([...selectedModelSizes, modelSize]);
+    }
+  };
+
+  const totalFilters = selectedModels.length + selectedAgents.length + selectedTrainingAgents.length + selectedBaseModels.length + selectedBenchmarks.length + selectedTrainingTypes.length + selectedModelSizes.length;
 
   return (
     <div className="space-y-4">
@@ -339,6 +367,96 @@ export default function FilterControlsWithBaseModel({
           </PopoverContent>
         </Popover>
 
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" data-testid="button-filter-training-types">
+              <Filter className="w-4 h-4 mr-2" />
+              Training Type
+              {selectedTrainingTypes.length > 0 && (
+                <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-xs">
+                  {selectedTrainingTypes.length}
+                </Badge>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-48" align="start" avoidCollisions={false}>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium text-sm">Filter by Training Type</h4>
+                <button
+                  onClick={() => onTrainingTypesChange([])}
+                  className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="space-y-2">
+                {availableTrainingTypes.map((trainingType) => (
+                  <div key={trainingType} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`training-type-${trainingType}`}
+                      checked={selectedTrainingTypes.includes(trainingType)}
+                      onCheckedChange={() => toggleTrainingType(trainingType)}
+                      data-testid={`checkbox-training-type-${trainingType}`}
+                    />
+                    <Label
+                      htmlFor={`training-type-${trainingType}`}
+                      className="text-sm cursor-pointer flex-1"
+                    >
+                      {trainingType}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" data-testid="button-filter-model-sizes">
+              <Filter className="w-4 h-4 mr-2" />
+              Model Size
+              {selectedModelSizes.length > 0 && (
+                <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-xs">
+                  {selectedModelSizes.length}
+                </Badge>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-48" align="start" avoidCollisions={false}>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium text-sm">Filter by Model Size</h4>
+                <button
+                  onClick={() => onModelSizesChange([])}
+                  className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {availableModelSizes.map((modelSize) => (
+                  <div key={modelSize} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`model-size-${modelSize}`}
+                      checked={selectedModelSizes.includes(modelSize)}
+                      onCheckedChange={() => toggleModelSize(modelSize)}
+                      data-testid={`checkbox-model-size-${modelSize}`}
+                    />
+                    <Label
+                      htmlFor={`model-size-${modelSize}`}
+                      className="text-sm cursor-pointer flex-1"
+                    >
+                      {modelSize}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+
         <Popover onOpenChange={(open) => { if (!open) setBenchmarkFilterSearch(''); }}>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" data-testid="button-filter-benchmarks">
@@ -465,6 +583,28 @@ export default function FilterControlsWithBaseModel({
               {baseModel}
               <button
                 onClick={() => toggleBaseModel(baseModel)}
+                className="hover-elevate active-elevate-2 rounded-sm"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </Badge>
+          ))}
+          {selectedTrainingTypes.map((trainingType) => (
+            <Badge key={`tt-${trainingType}`} variant="secondary" className="gap-1" data-testid={`badge-filter-training-type-${trainingType}`}>
+              {trainingType}
+              <button
+                onClick={() => toggleTrainingType(trainingType)}
+                className="hover-elevate active-elevate-2 rounded-sm"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </Badge>
+          ))}
+          {selectedModelSizes.map((modelSize) => (
+            <Badge key={`ms-${modelSize}`} variant="secondary" className="gap-1" data-testid={`badge-filter-model-size-${modelSize}`}>
+              {modelSize}
+              <button
+                onClick={() => toggleModelSize(modelSize)}
                 className="hover-elevate active-elevate-2 rounded-sm"
               >
                 <X className="w-3 h-3" />

@@ -107,6 +107,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         modelId: string;
         baseModelName: string;
         trainingType?: string;
+        modelSizeB?: number;
         firstEvalEndedAt?: string;
         latestEvalEndedAt?: string;
         modelCreatedAt?: string;
@@ -135,6 +136,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           daytonaOverrideCpus?: number;
           daytonaOverrideMemoryMb?: number;
           daytonaOverrideStorageMb?: number;
+          autoSnapshot?: boolean;
           // Job status for progress tracking
           jobStatus: string | null;
           username: string | null;
@@ -153,6 +155,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             modelId: result.modelId,
             baseModelName: result.baseModelName,
             trainingType: result.trainingType,
+            modelSizeB: result.modelSizeB,
             firstEvalEndedAt: result.endedAt,
             latestEvalEndedAt: result.endedAt,
             // Duplicate tracking fields
@@ -203,6 +206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           daytonaOverrideCpus: result.daytonaOverrideCpus,
           daytonaOverrideMemoryMb: result.daytonaOverrideMemoryMb,
           daytonaOverrideStorageMb: result.daytonaOverrideStorageMb,
+          autoSnapshot: result.autoSnapshot,
           // Job status for progress tracking
           jobStatus: result.jobStatus,
           username: result.username,
@@ -214,13 +218,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const formatTimestamp = (ts: string) => {
         const d = new Date(ts);
-        return d.toISOString().split('T')[0] + ' ' + d.toTimeString().split(' ')[0];
+        return d.toLocaleString('en-CA', {
+          timeZone: 'America/Los_Angeles',
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', second: '2-digit',
+          hour12: false,
+        }).replace(',', '');
       };
 
       // Build modelId → trainingAgentName, modelId → creationTime, modelId → trainingType lookups
       const modelTrainingAgentMap = new Map<string, string>();
       const modelCreationTimeMap = new Map<string, string>();
       const modelTrainingTypeMap = new Map<string, string>();
+      const modelSizeBMap = new Map<string, number>();
       for (const model of allModels) {
         modelTrainingAgentMap.set(model.modelId, model.agentName);
         if (model.creationTime) {
@@ -229,15 +239,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (model.trainingType) {
           modelTrainingTypeMap.set(model.modelId, model.trainingType);
         }
+        if (model.modelSizeB !== null) {
+          modelSizeBMap.set(model.modelId, model.modelSizeB);
+        }
       }
 
-      // Backfill trainingAgentName + modelCreatedAt + trainingType on existing eval-result rows
+      // Backfill trainingAgentName + modelCreatedAt + trainingType + modelSizeB on existing eval-result rows
       groupedData.forEach((group) => {
         group.trainingAgentName = modelTrainingAgentMap.get(group.modelId) ?? group.agentName;
         group.isNoEval = false;
         const ct = modelCreationTimeMap.get(group.modelId);
         if (ct) group.modelCreatedAt = formatTimestamp(ct);
         group.trainingType = modelTrainingTypeMap.get(group.modelId) ?? group.trainingType;
+        group.modelSizeB = modelSizeBMap.get(group.modelId) ?? group.modelSizeB;
       });
 
       // Collect model names that have ANY eval results
@@ -260,6 +274,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           modelId: model.modelId,
           baseModelName: model.baseModelName,
           trainingType: model.trainingType ?? undefined,
+          modelSizeB: model.modelSizeB ?? undefined,
           firstEvalEndedAt: undefined,
           latestEvalEndedAt: undefined,
           modelCreatedAt: model.creationTime ? formatTimestamp(model.creationTime) : undefined,
