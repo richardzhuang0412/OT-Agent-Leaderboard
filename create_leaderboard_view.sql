@@ -45,10 +45,10 @@ SELECT
   m.name as model_name,
   m.duplicate_of as model_duplicate_of,
   COALESCE(m_canonical.name, m.name) as canonical_model_name,
-  m.base_model_id,
-  COALESCE(bm.name, 'None') as base_model_name,
-  bm.duplicate_of as base_model_duplicate_of,
-  COALESCE(bm_canonical.name, COALESCE(bm.name, 'None')) as canonical_base_model_name,
+  COALESCE(m.base_model_id, m_canonical.base_model_id) as base_model_id,
+  COALESCE(bm.name, bm_via_canonical.name, 'None') as base_model_name,
+  COALESCE(bm.duplicate_of, bm_via_canonical.duplicate_of) as base_model_duplicate_of,
+  COALESCE(bm_canonical.name, bm_via_canonical_canonical.name, COALESCE(bm.name, bm_via_canonical.name, 'None')) as canonical_base_model_name,
   a.name as agent_name,
   a.id as agent_id,
   -- Return CANONICAL benchmark name as primary identifier
@@ -65,7 +65,7 @@ SELECT
   aj.hf_traces_link as hf_traces_link,
   aj.job_timestamp as ended_at,
   -- Expose base model resolution fields for server-side base model accuracy computation
-  COALESCE(bm.duplicate_of, m.base_model_id) as canonical_base_model_id,
+  COALESCE(bm.duplicate_of, bm_via_canonical.duplicate_of, COALESCE(m.base_model_id, m_canonical.base_model_id)) as canonical_base_model_id,
   -- Eval config and training type metadata
   aj.config as config,
   m.training_type as training_type,
@@ -79,7 +79,9 @@ INNER JOIN models m ON aj.model_id = m.id
 INNER JOIN benchmarks b ON aj.benchmark_id = b.id
 LEFT JOIN models bm ON m.base_model_id = bm.id
 LEFT JOIN models m_canonical ON m.duplicate_of = m_canonical.id
+LEFT JOIN models bm_via_canonical ON m_canonical.base_model_id = bm_via_canonical.id
 LEFT JOIN models bm_canonical ON bm.duplicate_of = bm_canonical.id
+LEFT JOIN models bm_via_canonical_canonical ON bm_via_canonical.duplicate_of = bm_via_canonical_canonical.id
 LEFT JOIN benchmarks b_canonical ON b.duplicate_of = b_canonical.id
 ORDER BY a.name, m.name, COALESCE(b_canonical.name, b.name), aj.job_timestamp;
 
