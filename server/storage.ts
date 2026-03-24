@@ -386,13 +386,14 @@ export class DbStorage implements IStorage {
       .map(row => {
         const agentName = agentMap.get(row.agent_id)!;
 
-        // Resolve base model name from base_model_id
-        const baseModel = row.base_model_id ? modelMap.get(row.base_model_id) : null;
-        const baseModelName = baseModel ? baseModel.name : 'None';
-
-        // Resolve canonical model name from duplicate_of
+        // Resolve canonical model from duplicate_of
         const canonicalModel = row.duplicate_of ? modelMap.get(row.duplicate_of) : null;
         const canonicalModelName = canonicalModel ? canonicalModel.name : row.name;
+
+        // Resolve base model name from base_model_id, falling back to canonical model's base
+        const effectiveBaseModelId = row.base_model_id ?? (canonicalModel ? canonicalModel.base_model_id : null);
+        const baseModel = effectiveBaseModelId ? modelMap.get(effectiveBaseModelId) : null;
+        const baseModelName = baseModel ? baseModel.name : 'None';
 
         // Resolve base model's duplicate_of
         const baseModelDuplicateOf = baseModel ? (baseModel.duplicate_of ?? null) : null;
