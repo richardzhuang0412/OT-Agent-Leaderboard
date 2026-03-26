@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { ChevronUp, ChevronDown, ChevronsUpDown, ExternalLink, AlertCircle } from 'lucide-react';
+import { ChevronUp, ChevronDown, ChevronsUpDown, ExternalLink, AlertCircle, Download } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { BLACKLISTED_MODELS } from '@/config/blacklistedModels';
 
@@ -538,6 +538,43 @@ export default function LeaderboardTableWithImprovement({
     return <ChevronsUpDown className="w-4 h-4 text-muted-foreground" />;
   };
 
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close export menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+    if (showExportMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showExportMenu]);
+
+  const handleExport = (column: string) => {
+    let values: string[];
+    if (column === 'modelName' || column === 'agentName' || column === 'baseModelName' || column === 'trainingType') {
+      values = filteredAndSortedData.map(row => row[column] || '');
+    } else {
+      // Benchmark column — export accuracy per row
+      values = filteredAndSortedData.map(row => {
+        const acc = row.benchmarks[column]?.accuracy;
+        return acc != null ? `${acc.toFixed(1)}%` : '—';
+      });
+    }
+    const blob = new Blob([values.join('\n')], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${column}_export.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setShowExportMenu(false);
+  };
+
   const getAccuracyColor = (accuracy: number) => {
     if (accuracy >= 90) return 'text-chart-2';
     if (accuracy >= 70) return 'text-chart-3';
@@ -683,11 +720,56 @@ export default function LeaderboardTableWithImprovement({
     );
   };
 
-  const totalColumns = 7 + visibleBenchmarks.length; // model + agent + base model + trainingType + modelCreatedAt + firstEvalEndedAt + latestEvalEndedAt + benchmark columns
+  const totalColumns = 8 + visibleBenchmarks.length; // # + model + agent + base model + trainingType + modelCreatedAt + firstEvalEndedAt + latestEvalEndedAt + benchmark columns
 
   return (
     <>
       <style>{scrollbarHidingStyles}</style>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm text-muted-foreground">
+          {filteredAndSortedData.length} result{filteredAndSortedData.length !== 1 ? 's' : ''}
+        </span>
+        <div className="relative" ref={exportMenuRef}>
+          <button
+            onClick={() => setShowExportMenu(prev => !prev)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-background hover:bg-muted transition-colors"
+            title="Export column to TXT"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Export
+          </button>
+          {showExportMenu && (
+            <div className="absolute right-0 top-full mt-1 z-50 w-56 rounded-md border border-border bg-popover shadow-md py-1 max-h-72 overflow-y-auto">
+              <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Fields</div>
+              {(['modelName', 'agentName', 'baseModelName', 'trainingType'] as const).map(field => (
+                <button
+                  key={field}
+                  onClick={() => handleExport(field)}
+                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors"
+                >
+                  {{ modelName: 'Model Name', agentName: 'Agent Name', baseModelName: 'Base Model', trainingType: 'Training Type' }[field]}
+                </button>
+              ))}
+              {visibleBenchmarks.length > 0 && (
+                <>
+                  <div className="border-t border-border my-1" />
+                  <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Benchmarks</div>
+                  {visibleBenchmarks.map(benchmark => (
+                    <button
+                      key={benchmark}
+                      onClick={() => handleExport(benchmark)}
+                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors truncate"
+                      title={benchmark}
+                    >
+                      {benchmark}
+                    </button>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
       <div className="border border-border rounded-md overflow-hidden">
         <div
           ref={topScrollBarRef}
@@ -710,7 +792,8 @@ export default function LeaderboardTableWithImprovement({
           <table className="w-full">
             <thead className="bg-muted/50 sticky top-0 z-10">
               <tr className="border-b border-border">
-                <th className="text-left px-6 py-4 min-w-[200px] sticky left-0 z-20 bg-muted/50">
+                <th className="sticky left-0 z-20 bg-muted/50 w-12 px-2 py-4 text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">#</th>
+                <th className="text-left px-6 py-4 min-w-[200px] sticky left-12 z-20 bg-muted/50">
                   <button
                     onClick={() => handleSort('modelName')}
                     className="flex items-center gap-2 font-medium text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-2 px-2 py-1 rounded-md"
@@ -848,7 +931,8 @@ export default function LeaderboardTableWithImprovement({
                       className={`border-b border-border hover-elevate ${rowBgClass}`}
                       data-testid={`row-result-${row.modelName}-${row.agentName}`}
                     >
-                      <td className={`px-6 py-4 sticky left-0 z-20 ${stickyCellBgClass}`}>
+                      <td className={`sticky left-0 z-20 ${stickyCellBgClass} w-12 px-2 py-4 text-center text-xs text-muted-foreground font-mono`}>{index + 1}</td>
+                      <td className={`px-6 py-4 sticky left-12 z-20 ${stickyCellBgClass}`}>
                         <span className="font-semibold text-foreground">{row.modelName}</span>
                         {row.modelSizeB != null && (
                           <span className={`ml-2 text-xs px-1.5 py-0.5 rounded font-mono font-medium ${modelSizeColor(row.modelSizeB)}`}>
