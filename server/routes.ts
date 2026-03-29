@@ -140,6 +140,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Job status for progress tracking
           jobStatus: string | null;
           username: string | null;
+          jobCreatedAt?: string;
         }>;
       }>();
 
@@ -210,6 +211,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Job status for progress tracking
           jobStatus: result.jobStatus,
           username: result.username,
+          // Job timestamp (for pending/started: COALESCE(started_at, created_at))
+          jobCreatedAt: result.endedAt,
         };
       }
 

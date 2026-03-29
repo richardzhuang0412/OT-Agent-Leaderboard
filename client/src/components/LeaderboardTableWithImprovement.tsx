@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { ChevronUp, ChevronDown, ChevronsUpDown, ExternalLink, AlertCircle, Download } from 'lucide-react';
+import { ChevronUp, ChevronDown, ChevronsUpDown, ExternalLink, AlertCircle, AlertTriangle, Download } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { BLACKLISTED_MODELS } from '@/config/blacklistedModels';
 
@@ -57,6 +57,7 @@ export interface PivotedLeaderboardRowWithImprovement {
     // Job status for progress tracking
     jobStatus?: string | null;
     username?: string | null;
+    jobCreatedAt?: string;
   }>;
 }
 
@@ -603,6 +604,7 @@ export default function LeaderboardTableWithImprovement({
       autoSnapshot?: boolean;
       jobStatus?: string | null;
       username?: string | null;
+      jobCreatedAt?: string;
     },
     benchmarkName?: string
   ) => {
@@ -621,19 +623,49 @@ export default function LeaderboardTableWithImprovement({
       const tooltipParts: string[] = [];
       if (benchmarkData.username) tooltipParts.push(`User: ${benchmarkData.username}`);
 
+      // Check if job is stale (>24h old)
+      let isStale = false;
+      let elapsedText = '';
+      if (benchmarkData.jobCreatedAt) {
+        const createdMs = new Date(benchmarkData.jobCreatedAt).getTime();
+        if (!isNaN(createdMs)) {
+          const elapsedMs = Date.now() - createdMs;
+          const elapsedHours = elapsedMs / (1000 * 60 * 60);
+          isStale = elapsedHours >= 24;
+          if (isStale) {
+            const days = Math.floor(elapsedHours / 24);
+            const hours = Math.floor(elapsedHours % 24);
+            elapsedText = days > 0 ? `${days}d ${hours}h` : `${hours}h`;
+            tooltipParts.push(`Submitted ${elapsedText} ago — may be stuck`);
+          }
+        }
+      }
+
       return (
         <div className="flex items-center gap-2 justify-end">
           {/* Status badge */}
           <div className="flex flex-col items-end gap-1">
-            <span
-              className={`inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-semibold ${badgeClass}`}
-              title={tooltipParts.length > 0 ? tooltipParts.join('\n') : undefined}
-            >
-              {label}
-            </span>
+            <div className="flex items-center gap-1">
+              {isStale && (
+                <span title={`Submitted ${elapsedText} ago`}>
+                  <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                </span>
+              )}
+              <span
+                className={`inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-semibold ${badgeClass}`}
+                title={tooltipParts.length > 0 ? tooltipParts.join('\n') : undefined}
+              >
+                {label}
+              </span>
+            </div>
             {benchmarkData.username && (
               <span className="font-mono text-[10px] text-muted-foreground truncate max-w-[100px]">
                 {benchmarkData.username}
+              </span>
+            )}
+            {isStale && (
+              <span className="font-mono text-[10px] text-red-500">
+                {elapsedText} ago
               </span>
             )}
           </div>

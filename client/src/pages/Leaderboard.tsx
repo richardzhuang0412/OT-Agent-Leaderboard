@@ -26,7 +26,7 @@ const EVAL_AGENT_NAMES = new Set(['terminus-2', 'openhands', 'mini-swe-agent', '
 
 export default function Leaderboard() {
   const [selectionMode, setSelectionMode] = useState<EvalSelectionMode>('highest');
-  const [activeTab, setActiveTab] = useState<'filtered' | 'all' | 'blacklisted' | 'base' | 'active'>('all');
+  const [activeTab, setActiveTab] = useState<'filtered' | 'all' | 'blacklisted' | 'base' | 'active' | 'pipeline' | 'missingEval'>('all');
   const [topN, setTopN] = useState<number>(50);
   const [recentlyAddedN, setRecentlyAddedN] = useState<number>(50);
   const [recentlyEvaledN, setRecentlyEvaledN] = useState<number>(50);
@@ -245,6 +245,16 @@ export default function Leaderboard() {
         return pivotedData;
       case 'filtered':
         return filteredByViewMode;
+      case 'pipeline':
+        return pivotedData.filter(row => row.modelName.startsWith('DCAgent/a1-'));
+      case 'missingEval':
+        return pivotedData.filter(row => {
+          if (row.isNoEval) return false;
+          return DEFAULT_VISIBLE_BENCHMARKS.some(bm => {
+            const b = row.benchmarks[bm];
+            return !b || b.accuracy === null;
+          });
+        });
     }
   }, [activeTab, pivotedData, filteredByViewMode]);
 
@@ -355,6 +365,8 @@ export default function Leaderboard() {
             <TabsTrigger value="active">Active</TabsTrigger>
             <TabsTrigger value="blacklisted">Blacklisted</TabsTrigger>
             <TabsTrigger value="base">Base Models</TabsTrigger>
+            <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
+            <TabsTrigger value="missingEval">Missing Eval</TabsTrigger>
           </TabsList>
 
           <TabsContent value="filtered" className="space-y-6">
@@ -614,7 +626,7 @@ export default function Leaderboard() {
           </TabsContent>
 
           {/* Shared content for all non-filtered tabs */}
-          {(['all', 'active', 'blacklisted', 'base'] as const).map(tabValue => (
+          {(['all', 'active', 'blacklisted', 'base', 'pipeline', 'missingEval'] as const).map(tabValue => (
             <TabsContent key={tabValue} value={tabValue} className="space-y-6">
               <SearchBarWithBaseModel
                 modelSearch={modelSearch}
