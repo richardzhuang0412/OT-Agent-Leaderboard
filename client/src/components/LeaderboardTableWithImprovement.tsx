@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { ChevronUp, ChevronDown, ChevronsUpDown, ExternalLink, AlertCircle, AlertTriangle, Download } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { BLACKLISTED_MODELS } from '@/config/blacklistedModels';
+import { DEFAULT_VISIBLE_BENCHMARKS } from '@/config/benchmarkConfig';
 
 // Hide scrollbar while keeping scroll functionality
 const scrollbarHidingStyles = `
@@ -79,6 +80,8 @@ interface LeaderboardTableWithImprovementProps {
   // Duplicate display controls
   showDuplicateBenchmarks: boolean;
   showDuplicateModels: boolean;
+  // When true, only show models missing a finished eval on at least one default benchmark
+  filterMissingEval?: boolean;
 }
 
 type SortField = 'modelName' | 'agentName' | 'baseModelName' | 'trainingType' | 'modelCreatedAt' | 'firstEvalEndedAt' | 'latestEvalEndedAt' | string; // string for dynamic benchmark names
@@ -112,7 +115,8 @@ export default function LeaderboardTableWithImprovement({
   benchmarkSearch,
   filters,
   showDuplicateBenchmarks,
-  showDuplicateModels
+  showDuplicateModels,
+  filterMissingEval
 }: LeaderboardTableWithImprovementProps) {
   const [sortField, setSortField] = useState<SortField>('modelCreatedAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -356,6 +360,31 @@ export default function LeaderboardTableWithImprovement({
   const filteredAndSortedData = useMemo(() => {
     let filtered = processedData;
 
+    // Missing eval filter: only show models missing a finished eval on at least one default benchmark
+    // Applied after duplicate merging so it sees the same data as the All Models view
+    if (filterMissingEval) {
+      const modelsWithAllBenchmarks = new Set<string>();
+      const modelBenchmarkCoverage = new Map<string, Set<string>>();
+      for (const row of filtered) {
+        if (row.isNoEval) continue;
+        let covered = modelBenchmarkCoverage.get(row.modelName);
+        if (!covered) {
+          covered = new Set<string>();
+          modelBenchmarkCoverage.set(row.modelName, covered);
+        }
+        for (const bm of DEFAULT_VISIBLE_BENCHMARKS) {
+          const b = row.benchmarks[bm];
+          if (b && b.accuracy !== null) covered.add(bm);
+        }
+      }
+      modelBenchmarkCoverage.forEach((covered, modelName) => {
+        if (DEFAULT_VISIBLE_BENCHMARKS.every(bm => covered.has(bm))) {
+          modelsWithAllBenchmarks.add(modelName);
+        }
+      });
+      filtered = filtered.filter(row => !modelsWithAllBenchmarks.has(row.modelName));
+    }
+
     // Filter by model search
     if (modelSearch) {
       const query = modelSearch.toLowerCase();
@@ -484,7 +513,7 @@ export default function LeaderboardTableWithImprovement({
     }
 
     return filtered;
-  }, [processedData, modelSearch, agentSearch, baseModelSearch, filters, sortField, sortDirection, sortModePerBenchmark]);
+  }, [processedData, modelSearch, agentSearch, baseModelSearch, filters, sortField, sortDirection, sortModePerBenchmark, filterMissingEval]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
