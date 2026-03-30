@@ -247,14 +247,30 @@ export default function Leaderboard() {
         return filteredByViewMode;
       case 'pipeline':
         return pivotedData.filter(row => row.modelName.startsWith('DCAgent/a1-'));
-      case 'missingEval':
-        return pivotedData.filter(row => {
-          if (row.isNoEval) return false;
-          return DEFAULT_VISIBLE_BENCHMARKS.some(bm => {
+      case 'missingEval': {
+        // Build set of models that have finished results on ALL 3 default benchmarks (across any row)
+        const modelsWithAllBenchmarks = new Set<string>();
+        const modelBenchmarkCoverage = new Map<string, Set<string>>();
+        for (const row of pivotedData) {
+          if (row.isNoEval) continue;
+          let covered = modelBenchmarkCoverage.get(row.modelName);
+          if (!covered) {
+            covered = new Set<string>();
+            modelBenchmarkCoverage.set(row.modelName, covered);
+          }
+          for (const bm of DEFAULT_VISIBLE_BENCHMARKS) {
             const b = row.benchmarks[bm];
-            return !b || b.accuracy === null;
-          });
+            if (b && b.accuracy !== null) covered.add(bm);
+          }
+        }
+        modelBenchmarkCoverage.forEach((covered, modelName) => {
+          if (DEFAULT_VISIBLE_BENCHMARKS.every(bm => covered.has(bm))) {
+            modelsWithAllBenchmarks.add(modelName);
+          }
         });
+        // Show rows for models that DON'T have all 3 benchmarks covered
+        return pivotedData.filter(row => !modelsWithAllBenchmarks.has(row.modelName));
+      }
     }
   }, [activeTab, pivotedData, filteredByViewMode]);
 
