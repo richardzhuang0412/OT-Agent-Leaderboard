@@ -232,6 +232,44 @@ export class DbStorage implements IStorage {
     return results;
   }
 
+  /**
+   * Build a benchmark equivalence map: for each benchmark name, collect all names
+   * that refer to the same logical benchmark (canonical + all duplicates).
+   */
+  private buildBenchmarkAliases(rows: RawLeaderboardRow[]): Map<string, string[]> {
+    const toCanonical = new Map<string, string>();
+    for (const row of rows) {
+      const source = row.source_benchmark_name ?? row.benchmark_name;
+      const canonical = row.canonical_benchmark_name ?? row.benchmark_name;
+      if (source !== canonical) {
+        toCanonical.set(source, canonical);
+      }
+      if (!toCanonical.has(canonical)) {
+        toCanonical.set(canonical, canonical);
+      }
+    }
+
+    const canonicalToAliases = new Map<string, Set<string>>();
+    toCanonical.forEach((canonical, name) => {
+      let aliases = canonicalToAliases.get(canonical);
+      if (!aliases) {
+        aliases = new Set<string>();
+        canonicalToAliases.set(canonical, aliases);
+      }
+      aliases.add(name);
+      aliases.add(canonical);
+    });
+
+    const result = new Map<string, string[]>();
+    canonicalToAliases.forEach((aliases) => {
+      const aliasArray = Array.from(aliases);
+      for (const name of aliasArray) {
+        result.set(name, aliasArray);
+      }
+    });
+    return result;
+  }
+
   async getAllBenchmarkResultsWithImprovement(mode: EvalSelectionMode = 'oldest', hideNoTraceLink: boolean = false): Promise<BenchmarkResultWithImprovement[]> {
     let allRows = await this.fetchAllRawRows();
 
@@ -241,31 +279,80 @@ export class DbStorage implements IStorage {
     }
 
     const index = this.buildGroupIndex(allRows);
+    const benchmarkAliases = this.buildBenchmarkAliases(allRows);
 
-    const results: BenchmarkResultWithImprovement[] = [];
-
+    // --- Pass 1: Select best result per (agent, model, benchmark) group ---
+    type SelectedRow = RawLeaderboardRow & { resolvedAccuracy: number | undefined };
+    const selectedRows: SelectedRow[] = [];
     for (const pool of Array.from(index.values())) {
       const selected = selectResult(pool, mode);
       if (!selected) continue;
+      selectedRows.push({ ...selected, resolvedAccuracy: selected.accuracy ?? undefined });
+    }
 
-      // Compute the 4 base model accuracy values by looking up base model pools
+    // --- Pass 2: Build resolved accuracy map ---
+    // Key: canonicalModelName|||benchmarkName → accuracy
+    // Merges all duplicate model entries and benchmark aliases into one canonical accuracy.
+    // This means if model ID A (name "Qwen/Qwen3-8B") was evaluated with agent X on benchmark B,
+    // and model ID C (name "hosted_vllm/Qwen/Qwen3-8B", duplicate of A) was evaluated with agent Y
+    // on benchmark B, both contribute to the resolved accuracy for "Qwen/Qwen3-8B" on B.
+    const resolvedAccuracy = new Map<string, number>();
 
-      // 1. base_model_accuracy: original base model on same canonical benchmark
-      const baseModelAccuracy = this.lookupBaseModelAccuracy(
-        index, selected.agent_id, selected.base_model_id, selected.benchmark_name, mode
+    for (const row of selectedRows) {
+      if (row.resolvedAccuracy === undefined) continue;
+
+      const modelNames = new Set<string>();
+      modelNames.add(row.model_name);
+      if (row.canonical_model_name) modelNames.add(row.canonical_model_name);
+      const stripped = row.model_name.replace(/^hosted_vllm\//, '');
+      if (stripped !== row.model_name) modelNames.add(stripped);
+
+      const bmNames = new Set<string>();
+      bmNames.add(row.benchmark_name);
+      if (row.canonical_benchmark_name) bmNames.add(row.canonical_benchmark_name);
+      const aliases = benchmarkAliases.get(row.benchmark_name);
+      if (aliases) aliases.forEach(a => bmNames.add(a));
+
+      modelNames.forEach(mn => {
+        bmNames.forEach(bn => {
+          const key = `${mn}|||${bn}`;
+          const existing = resolvedAccuracy.get(key);
+          if (existing === undefined || row.resolvedAccuracy! > existing) {
+            resolvedAccuracy.set(key, row.resolvedAccuracy!);
+          }
+        });
+      });
+    }
+
+    // --- Pass 3: Compute improvement using resolved accuracy map ---
+    const lookupResolved = (baseModelName: string | undefined, benchmarkName: string): number | undefined => {
+      if (!baseModelName || baseModelName === 'None') return undefined;
+
+      const direct = resolvedAccuracy.get(`${baseModelName}|||${benchmarkName}`);
+      if (direct !== undefined) return direct;
+
+      const strippedName = baseModelName.replace(/^hosted_vllm\//, '');
+      if (strippedName !== baseModelName) {
+        const strippedResult = resolvedAccuracy.get(`${strippedName}|||${benchmarkName}`);
+        if (strippedResult !== undefined) return strippedResult;
+      }
+
+      const prefixed = `hosted_vllm/${baseModelName}`;
+      const prefixedResult = resolvedAccuracy.get(`${prefixed}|||${benchmarkName}`);
+      if (prefixedResult !== undefined) return prefixedResult;
+
+      return undefined;
+    };
+
+    const results: BenchmarkResultWithImprovement[] = [];
+
+    for (const selected of selectedRows) {
+      const baseModelAccuracy = lookupResolved(selected.base_model_name, selected.benchmark_name);
+      const canonicalBaseModelAccuracy = lookupResolved(
+        selected.canonical_base_model_name ?? selected.base_model_name,
+        selected.benchmark_name
       );
-
-      // 2. canonical_benchmark_base_model_accuracy: same as base_model_accuracy
-      //    (with merged approach, canonical benchmark is already the key)
       const canonicalBenchmarkBaseModelAccuracy = baseModelAccuracy;
-
-      // 3. canonical_base_model_accuracy: canonical base model on same benchmark
-      const canonicalBaseModelAccuracy = this.lookupBaseModelAccuracy(
-        index, selected.agent_id, selected.canonical_base_model_id, selected.benchmark_name, mode
-      );
-
-      // 4. canonical_both_base_model_accuracy: canonical base model on canonical benchmark
-      //    (same as #3 since benchmark_name is already canonical)
       const canonicalBothBaseModelAccuracy = canonicalBaseModelAccuracy;
 
       // Extract config fields (handle both parsed object and string JSONB)
@@ -319,29 +406,6 @@ export class DbStorage implements IStorage {
     }
 
     return results;
-  }
-
-  /**
-   * Look up base model accuracy by finding the base model's results for the same
-   * agent + canonical benchmark, then applying the same selection mode.
-   */
-  private lookupBaseModelAccuracy(
-    index: Map<string, RawLeaderboardRow[]>,
-    agentId: string,
-    baseModelId: string | null,
-    benchmarkName: string,
-    mode: EvalSelectionMode
-  ): number | undefined {
-    if (!baseModelId) return undefined;
-
-    const key = `${agentId}|||${baseModelId}|||${benchmarkName}`;
-    const pool = index.get(key);
-    if (!pool || pool.length === 0) return undefined;
-
-    const selected = selectResult(pool, mode);
-    if (!selected) return undefined;
-
-    return selected.accuracy ?? undefined;
   }
 
   async getAllModels(): Promise<ModelInfo[]> {
