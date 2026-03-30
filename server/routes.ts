@@ -182,8 +182,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const standardError = isFinished ? result.standardError : null;
 
         // Calculate improvement as absolute difference (percentage points) — only for Finished jobs
-        const improvement = (isFinished && result.baseModelAccuracy !== undefined)
-          ? result.accuracy - result.baseModelAccuracy
+        // Fall back through canonical variants if direct base model accuracy isn't available
+        const effectiveBaseModelAccuracy = result.baseModelAccuracy
+          ?? result.canonicalBenchmarkBaseModelAccuracy
+          ?? result.canonicalBaseModelAccuracy
+          ?? result.canonicalBothBaseModelAccuracy;
+        const improvement = (isFinished && effectiveBaseModelAccuracy !== undefined)
+          ? result.accuracy - effectiveBaseModelAccuracy
           : undefined;
 
         group.benchmarks[result.benchmarkName] = {
