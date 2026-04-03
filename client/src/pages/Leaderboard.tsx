@@ -46,6 +46,8 @@ export default function Leaderboard() {
   const [showDuplicateBenchmarks, setShowDuplicateBenchmarks] = useState(false);
   const [showDuplicateModels, setShowDuplicateModels] = useState(false);
   const [hideNoTraceLink, setHideNoTraceLink] = useState(false);
+  const [hideBlacklisted, setHideBlacklisted] = useState(false);
+  const [hideBaseModels, setHideBaseModels] = useState(false);
 
   // Always fetch improvement metrics data (query key includes mode for per-mode caching)
   const { data: pivotedData = [], isLoading, isFetching, refetch } = useQuery<PivotedLeaderboardRowWithImprovement[]>({
@@ -460,6 +462,32 @@ export default function Leaderboard() {
                   Hide evals with no trace link
                 </label>
               </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="hide-blacklisted"
+                  checked={hideBlacklisted}
+                  onCheckedChange={(checked) => setHideBlacklisted(checked === true)}
+                />
+                <label
+                  htmlFor="hide-blacklisted"
+                  className="text-sm text-muted-foreground cursor-pointer select-none"
+                >
+                  Hide blacklisted models
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="hide-base-models"
+                  checked={hideBaseModels}
+                  onCheckedChange={(checked) => setHideBaseModels(checked === true)}
+                />
+                <label
+                  htmlFor="hide-base-models"
+                  className="text-sm text-muted-foreground cursor-pointer select-none"
+                >
+                  Hide base models
+                </label>
+              </div>
             </div>
           </div>
 
@@ -618,6 +646,8 @@ export default function Leaderboard() {
               }}
               showDuplicateBenchmarks={showDuplicateBenchmarks}
               showDuplicateModels={showDuplicateModels}
+              hideBlacklisted={hideBlacklisted}
+              hideBaseModels={hideBaseModels}
             />
           </TabsContent>
 
@@ -703,6 +733,32 @@ export default function Leaderboard() {
                       className="text-sm text-muted-foreground cursor-pointer select-none"
                     >
                       Hide evals with no trace link
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id={`hide-blacklisted-${tabValue}`}
+                      checked={hideBlacklisted}
+                      onCheckedChange={(checked) => setHideBlacklisted(checked === true)}
+                    />
+                    <label
+                      htmlFor={`hide-blacklisted-${tabValue}`}
+                      className="text-sm text-muted-foreground cursor-pointer select-none"
+                    >
+                      Hide blacklisted models
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id={`hide-base-models-${tabValue}`}
+                      checked={hideBaseModels}
+                      onCheckedChange={(checked) => setHideBaseModels(checked === true)}
+                    />
+                    <label
+                      htmlFor={`hide-base-models-${tabValue}`}
+                      className="text-sm text-muted-foreground cursor-pointer select-none"
+                    >
+                      Hide base models
                     </label>
                   </div>
                 </div>
@@ -856,6 +912,8 @@ export default function Leaderboard() {
                 }}
                 showDuplicateBenchmarks={showDuplicateBenchmarks}
                 showDuplicateModels={showDuplicateModels}
+                hideBlacklisted={hideBlacklisted}
+                hideBaseModels={hideBaseModels}
                 filterMissingEval={tabValue === 'missingEval'}
               />
             </TabsContent>
