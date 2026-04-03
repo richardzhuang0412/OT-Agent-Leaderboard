@@ -82,6 +82,10 @@ interface LeaderboardTableWithImprovementProps {
   showDuplicateModels: boolean;
   // When true, only show models missing a finished eval on at least one default benchmark
   filterMissingEval?: boolean;
+  // When true, hide blacklisted models
+  hideBlacklisted?: boolean;
+  // When true, hide base models (baseModelName === 'None')
+  hideBaseModels?: boolean;
 }
 
 type SortField = 'modelName' | 'agentName' | 'baseModelName' | 'trainingType' | 'modelCreatedAt' | 'firstEvalEndedAt' | 'latestEvalEndedAt' | string; // string for dynamic benchmark names
@@ -116,7 +120,9 @@ export default function LeaderboardTableWithImprovement({
   filters,
   showDuplicateBenchmarks,
   showDuplicateModels,
-  filterMissingEval
+  filterMissingEval,
+  hideBlacklisted,
+  hideBaseModels
 }: LeaderboardTableWithImprovementProps) {
   const [sortField, setSortField] = useState<SortField>('modelCreatedAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -385,6 +391,16 @@ export default function LeaderboardTableWithImprovement({
       filtered = filtered.filter(row => !modelsWithAllBenchmarks.has(row.modelName));
     }
 
+    // Hide blacklisted models
+    if (hideBlacklisted) {
+      filtered = filtered.filter(row => !BLACKLISTED_MODELS.has(row.modelName));
+    }
+
+    // Hide base models
+    if (hideBaseModels) {
+      filtered = filtered.filter(row => row.baseModelName !== 'None');
+    }
+
     // Filter by model search
     if (modelSearch) {
       const query = modelSearch.toLowerCase();
@@ -513,7 +529,7 @@ export default function LeaderboardTableWithImprovement({
     }
 
     return filtered;
-  }, [processedData, modelSearch, agentSearch, baseModelSearch, filters, sortField, sortDirection, sortModePerBenchmark, filterMissingEval]);
+  }, [processedData, modelSearch, agentSearch, baseModelSearch, filters, sortField, sortDirection, sortModePerBenchmark, filterMissingEval, hideBlacklisted, hideBaseModels]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
