@@ -141,6 +141,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           jobStatus: string | null;
           username: string | null;
           jobCreatedAt?: string;
+          isOverlong: boolean;
         }>;
       }>();
 
@@ -218,6 +219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           username: result.username,
           // Job timestamp (for pending/started: COALESCE(started_at, created_at))
           jobCreatedAt: result.endedAt,
+          isOverlong: result.isOverlong,
         };
       }
 

@@ -72,7 +72,8 @@ SELECT
   m.model_size_b as model_size_b,
   -- Job status and user info for progress tracking
   aj.job_status::text as job_status,
-  aj.username as username
+  aj.username as username,
+  COALESCE(aj.is_overlong, false) as is_overlong
 FROM all_jobs aj
 INNER JOIN agents a ON aj.agent_id = a.id
 INNER JOIN models m ON aj.model_id = m.id

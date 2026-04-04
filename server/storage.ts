@@ -46,6 +46,7 @@ export interface BenchmarkResultWithImprovement extends BenchmarkResultExtended 
   // Job status for progress tracking
   jobStatus: string | null;
   username: string | null;
+  isOverlong: boolean;
 }
 
 export interface ModelInfo {
@@ -93,6 +94,7 @@ interface RawLeaderboardRow {
   model_size_b: number | null;
   job_status: string | null;
   username: string | null;
+  is_overlong: boolean;
 }
 
 const JOB_STATUS_PRIORITY: Record<string, number> = {
@@ -104,6 +106,7 @@ const JOB_STATUS_PRIORITY: Record<string, number> = {
 /**
  * Select one result from a pool of results based on the eval selection mode.
  * Priority: Finished > Started > Pending. Among Finished results:
+ * - Non-overlong results are preferred over overlong (partial) results
  * - oldest: prefer accuracy > 1% → then earliest timestamp
  * - latest: prefer accuracy > 1% → then latest timestamp
  * - highest: highest accuracy (no threshold)
@@ -112,15 +115,18 @@ const JOB_STATUS_PRIORITY: Record<string, number> = {
 function selectResult(pool: RawLeaderboardRow[], mode: EvalSelectionMode): RawLeaderboardRow | null {
   if (pool.length === 0) return null;
 
-  // Separate Finished (have accuracy) from Pending/Started
-  const finished = pool.filter(r => r.accuracy !== null);
-  const nonFinished = pool.filter(r => r.accuracy === null);
+  // Separate usable results (Finished with accuracy) from non-usable (Pending/Started/Failed)
+  const finished = pool.filter(r => r.accuracy !== null && r.job_status !== 'Failed');
+  const nonFinished = pool.filter(r => r.accuracy === null || r.job_status === 'Failed');
 
-  // If we have any Finished results, use existing selection logic among those
+  // If we have any Finished results, prefer non-overlong over overlong
   if (finished.length > 0) {
+    const nonOverlong = finished.filter(r => !r.is_overlong);
+    const candidates_pool = nonOverlong.length > 0 ? nonOverlong : finished;
+
     if (mode === 'highest') {
-      let best = finished[0];
-      for (const row of finished) {
+      let best = candidates_pool[0];
+      for (const row of candidates_pool) {
         if ((row.accuracy ?? 0) > (best.accuracy ?? 0)) {
           best = row;
         }
@@ -129,8 +135,8 @@ function selectResult(pool: RawLeaderboardRow[], mode: EvalSelectionMode): RawLe
     }
 
     // For oldest/latest: prefer results with accuracy > 1%, then sort by timestamp
-    const aboveThreshold = finished.filter(r => (r.accuracy ?? 0) > 1.0);
-    const candidates = aboveThreshold.length > 0 ? aboveThreshold : finished;
+    const aboveThreshold = candidates_pool.filter(r => (r.accuracy ?? 0) > 1.0);
+    const candidates = aboveThreshold.length > 0 ? aboveThreshold : candidates_pool;
 
     const sorted = [...candidates].sort((a, b) => {
       const tsA = a.ended_at ? new Date(a.ended_at).getTime() : 0;
@@ -402,6 +408,7 @@ export class DbStorage implements IStorage {
         modelSizeB: selected.model_size_b ?? undefined,
         jobStatus: selected.job_status ?? null,
         username: selected.username ?? null,
+        isOverlong: selected.is_overlong ?? false,
       });
     }
 
