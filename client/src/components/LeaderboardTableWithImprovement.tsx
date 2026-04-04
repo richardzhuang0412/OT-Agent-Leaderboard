@@ -59,6 +59,7 @@ export interface PivotedLeaderboardRowWithImprovement {
     jobStatus?: string | null;
     username?: string | null;
     jobCreatedAt?: string;
+    isOverlong?: boolean;
   }>;
 }
 
@@ -650,6 +651,7 @@ export default function LeaderboardTableWithImprovement({
       jobStatus?: string | null;
       username?: string | null;
       jobCreatedAt?: string;
+      isOverlong?: boolean;
     },
     benchmarkName?: string
   ) => {
@@ -718,7 +720,8 @@ export default function LeaderboardTableWithImprovement({
       );
     }
 
-    // Finished jobs (or legacy rows without jobStatus): show accuracy as before
+    // Finished jobs (or legacy rows without jobStatus): show accuracy
+    const isOverlong = benchmarkData.isOverlong === true;
 
     // Special handling for dev_set_71_tasks: show red warning flag for missing links
     const isDevSet71Tasks = benchmarkName === 'dev_set_71_tasks';
@@ -772,23 +775,32 @@ export default function LeaderboardTableWithImprovement({
                 ? `D: ${benchmarkData.daytonaOverrideCpus ?? 'x'}/${benchmarkData.daytonaOverrideMemoryMb != null ? (benchmarkData.daytonaOverrideMemoryMb / 1024).toFixed(0) : 'x'}/${benchmarkData.daytonaOverrideStorageMb != null ? (benchmarkData.daytonaOverrideStorageMb / 1024).toFixed(0) : 'x'}`
                 : 'D: Default'}
           </span>
+          {isOverlong && (
+            <span
+              className="inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold bg-red-500/15 text-red-500 border-red-500/30"
+              title="Eval timed out — partial/incomplete results"
+            >
+              <AlertTriangle className="w-3 h-3 mr-0.5" />
+              Overlong
+            </span>
+          )}
         </div>
-        {/* Numbers column — right-aligned */}
+        {/* Numbers column — right-aligned, red+bold for Overlong */}
         <div className="flex flex-col items-end gap-1">
           {benchmarkData.accuracy != null ? (
-            <span className={`font-mono font-semibold text-sm ${getAccuracyColor(benchmarkData.accuracy)}`}>
+            <span className={`font-mono text-sm ${isOverlong ? 'text-red-500 font-bold' : `font-semibold ${getAccuracyColor(benchmarkData.accuracy)}`}`}>
               {benchmarkData.accuracy.toFixed(1)}%
             </span>
           ) : (
             <span className="font-mono text-sm text-muted-foreground">--</span>
           )}
           {benchmarkData.standardError != null ? (
-            <span className="font-mono text-xs text-muted-foreground">
+            <span className={`font-mono text-xs ${isOverlong ? 'text-red-500 font-bold' : 'text-muted-foreground'}`}>
               ±{benchmarkData.standardError.toFixed(2)}
             </span>
           ) : null}
           {benchmarkData.improvement !== undefined && (
-            <span className={`font-mono text-xs font-medium ${getImprovementColor(benchmarkData.improvement)}`}>
+            <span className={`font-mono text-xs ${isOverlong ? 'text-red-500 font-bold' : `font-medium ${getImprovementColor(benchmarkData.improvement)}`}`}>
               {benchmarkData.improvement >= 0 ? '+' : ''}{benchmarkData.improvement.toFixed(2)} pp
             </span>
           )}
