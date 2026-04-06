@@ -83,6 +83,7 @@ interface LeaderboardTableWithImprovementProps {
   // Duplicate display controls
   showDuplicateBenchmarks: boolean;
   showDuplicateModels: boolean;
+  showDuplicateAgents: boolean;
   // When true, only show models missing a finished eval on at least one default benchmark
   filterMissingEval?: boolean;
   // When true, hide blacklisted models
@@ -123,6 +124,7 @@ export default function LeaderboardTableWithImprovement({
   filters,
   showDuplicateBenchmarks,
   showDuplicateModels,
+  showDuplicateAgents,
   filterMissingEval,
   hideBlacklisted,
   hideBaseModels
@@ -330,8 +332,66 @@ export default function LeaderboardTableWithImprovement({
       });
     }
 
+    // If not showing duplicate agents, merge duplicate agent rows into canonical rows
+    if (!showDuplicateAgents) {
+      const canonicalRows = new Map<string, typeof processed[0]>();
+      const duplicateRows: typeof processed = [];
+
+      for (const row of processed) {
+        if (row.agentDuplicateOf === null) {
+          const key = `${row.modelName}|||${row.agentName}`;
+          canonicalRows.set(key, { ...row, benchmarks: { ...row.benchmarks } });
+        } else {
+          duplicateRows.push(row);
+        }
+      }
+
+      // Merge duplicate agent rows into canonical
+      for (const dupRow of duplicateRows) {
+        const canonicalKey = `${dupRow.modelName}|||${dupRow.canonicalAgentName}`;
+        let canonicalRow = canonicalRows.get(canonicalKey);
+
+        if (!canonicalRow) {
+          canonicalRow = {
+            ...dupRow,
+            agentName: dupRow.canonicalAgentName,
+            agentDuplicateOf: null,
+            benchmarks: {}
+          };
+          canonicalRows.set(canonicalKey, canonicalRow);
+        }
+
+        // Merge benchmarks: fill gaps, prefer Finished over Pending/Started
+        for (const [benchmarkName, benchmarkData] of Object.entries(dupRow.benchmarks)) {
+          const existing = canonicalRow.benchmarks[benchmarkName];
+          if (!existing) {
+            canonicalRow.benchmarks[benchmarkName] = { ...benchmarkData };
+          } else if (existing.accuracy === null && benchmarkData.accuracy !== null) {
+            canonicalRow.benchmarks[benchmarkName] = { ...benchmarkData };
+          }
+        }
+
+        // Merge timestamps
+        if (dupRow.firstEvalEndedAt && (!canonicalRow.firstEvalEndedAt || dupRow.firstEvalEndedAt < canonicalRow.firstEvalEndedAt)) {
+          canonicalRow.firstEvalEndedAt = dupRow.firstEvalEndedAt;
+        }
+        if (dupRow.latestEvalEndedAt && (!canonicalRow.latestEvalEndedAt || dupRow.latestEvalEndedAt > canonicalRow.latestEvalEndedAt)) {
+          canonicalRow.latestEvalEndedAt = dupRow.latestEvalEndedAt;
+        }
+      }
+
+      processed = Array.from(canonicalRows.values());
+
+      // Remove NO EVAL rows for agents that have real eval rows
+      const agentsWithRealEvals = new Set<string>();
+      for (const row of processed) {
+        if (!row.isNoEval) agentsWithRealEvals.add(`${row.modelName}|||${row.agentName}`);
+      }
+      processed = processed.filter(row => !(row.isNoEval && agentsWithRealEvals.has(`${row.modelName}|||${row.agentName}`)));
+    }
+
     return processed;
-  }, [data, showDuplicateModels, showDuplicateBenchmarks, benchmarkDuplicateMap]);
+  }, [data, showDuplicateModels, showDuplicateAgents, showDuplicateBenchmarks, benchmarkDuplicateMap]);
 
   // Get all unique benchmark names from the processed data
   const allBenchmarks = useMemo(() => {
