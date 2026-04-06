@@ -308,16 +308,16 @@ export default function Leaderboard() {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 gap-4">
-            <div className="flex items-center gap-4">
-              <h1 className="text-2xl font-bold text-foreground" data-testid="text-page-title">
+          <div className="flex items-center justify-between h-14 sm:h-16 gap-2 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+              <h1 className="text-lg sm:text-2xl font-bold text-foreground truncate" data-testid="text-page-title">
                 LLM Agent Benchmark
               </h1>
-              <Badge variant="secondary" data-testid="text-total-entries">
+              <Badge variant="secondary" className="hidden sm:inline-flex" data-testid="text-total-entries">
                 {pivotedData.length} rows
               </Badge>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
               <Button
                 variant="outline"
                 size="sm"
@@ -333,9 +333,9 @@ export default function Leaderboard() {
         </div>
       </header>
 
-      <main className="px-4 sm:px-6 lg:px-8 py-8">
+      <main className="px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Eval Selection Mode */}
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4 mb-4 sm:mb-6">
           <span className="text-sm font-medium text-foreground">Result Selection:</span>
           <ToggleGroup
             type="single"
@@ -348,7 +348,7 @@ export default function Leaderboard() {
             <ToggleGroupItem value="latest">Latest</ToggleGroupItem>
             <ToggleGroupItem value="highest">Highest</ToggleGroupItem>
           </ToggleGroup>
-          <span className="text-xs text-muted-foreground max-w-md">
+          <span className="hidden sm:inline text-xs text-muted-foreground max-w-md">
             {SELECTION_MODE_DESCRIPTIONS[selectionMode]}
           </span>
           {isFetching && !isLoading && (
@@ -357,15 +357,17 @@ export default function Leaderboard() {
         </div>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
-          <TabsList>
-            <TabsTrigger value="all">All Models</TabsTrigger>
-            <TabsTrigger value="filtered">Filtered View</TabsTrigger>
-            <TabsTrigger value="active">Active</TabsTrigger>
-            <TabsTrigger value="blacklisted">Blacklisted</TabsTrigger>
-            <TabsTrigger value="base">Base Models</TabsTrigger>
-            <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
-            <TabsTrigger value="missingEval">Missing Eval</TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+            <TabsList className="inline-flex w-auto min-w-full sm:min-w-0">
+              <TabsTrigger value="all" className="text-xs sm:text-sm">All Models</TabsTrigger>
+              <TabsTrigger value="filtered" className="text-xs sm:text-sm">Filtered View</TabsTrigger>
+              <TabsTrigger value="active" className="text-xs sm:text-sm">Active</TabsTrigger>
+              <TabsTrigger value="blacklisted" className="text-xs sm:text-sm">Blacklisted</TabsTrigger>
+              <TabsTrigger value="base" className="text-xs sm:text-sm">Base Models</TabsTrigger>
+              <TabsTrigger value="pipeline" className="text-xs sm:text-sm">Pipeline</TabsTrigger>
+              <TabsTrigger value="missingEval" className="text-xs sm:text-sm">Missing Eval</TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="filtered" className="space-y-6">
             <ViewModeControls
@@ -422,7 +424,7 @@ export default function Leaderboard() {
             />
 
             {/* Duplicate Display Controls */}
-            <div className="flex items-center gap-6">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:gap-6">
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="show-duplicate-benchmarks"
@@ -431,7 +433,7 @@ export default function Leaderboard() {
                 />
                 <label
                   htmlFor="show-duplicate-benchmarks"
-                  className="text-sm text-muted-foreground cursor-pointer select-none"
+                  className="text-xs sm:text-sm text-muted-foreground cursor-pointer select-none"
                 >
                   Show duplicate benchmarks
                 </label>
@@ -444,7 +446,7 @@ export default function Leaderboard() {
                 />
                 <label
                   htmlFor="show-duplicate-models"
-                  className="text-sm text-muted-foreground cursor-pointer select-none"
+                  className="text-xs sm:text-sm text-muted-foreground cursor-pointer select-none"
                 >
                   Show duplicate models
                 </label>
@@ -457,7 +459,7 @@ export default function Leaderboard() {
                 />
                 <label
                   htmlFor="hide-no-trace-link"
-                  className="text-sm text-muted-foreground cursor-pointer select-none"
+                  className="text-xs sm:text-sm text-muted-foreground cursor-pointer select-none"
                 >
                   Hide evals with no trace link
                 </label>
@@ -470,7 +472,7 @@ export default function Leaderboard() {
                 />
                 <label
                   htmlFor="hide-blacklisted"
-                  className="text-sm text-muted-foreground cursor-pointer select-none"
+                  className="text-xs sm:text-sm text-muted-foreground cursor-pointer select-none"
                 >
                   Hide blacklisted models
                 </label>
@@ -483,7 +485,7 @@ export default function Leaderboard() {
                 />
                 <label
                   htmlFor="hide-base-models"
-                  className="text-sm text-muted-foreground cursor-pointer select-none"
+                  className="text-xs sm:text-sm text-muted-foreground cursor-pointer select-none"
                 >
                   Hide base models
                 </label>
@@ -695,7 +697,7 @@ export default function Leaderboard() {
                 />
 
                 {/* Duplicate Display Controls */}
-                <div className="flex items-center gap-6">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:gap-6">
                   <div className="flex items-center gap-2">
                     <Checkbox
                       id={`show-duplicate-benchmarks-${tabValue}`}
@@ -704,7 +706,7 @@ export default function Leaderboard() {
                     />
                     <label
                       htmlFor={`show-duplicate-benchmarks-${tabValue}`}
-                      className="text-sm text-muted-foreground cursor-pointer select-none"
+                      className="text-xs sm:text-sm text-muted-foreground cursor-pointer select-none"
                     >
                       Show duplicate benchmarks
                     </label>
@@ -717,7 +719,7 @@ export default function Leaderboard() {
                     />
                     <label
                       htmlFor={`show-duplicate-models-${tabValue}`}
-                      className="text-sm text-muted-foreground cursor-pointer select-none"
+                      className="text-xs sm:text-sm text-muted-foreground cursor-pointer select-none"
                     >
                       Show duplicate models
                     </label>
@@ -730,7 +732,7 @@ export default function Leaderboard() {
                     />
                     <label
                       htmlFor={`hide-no-trace-link-${tabValue}`}
-                      className="text-sm text-muted-foreground cursor-pointer select-none"
+                      className="text-xs sm:text-sm text-muted-foreground cursor-pointer select-none"
                     >
                       Hide evals with no trace link
                     </label>
@@ -743,7 +745,7 @@ export default function Leaderboard() {
                     />
                     <label
                       htmlFor={`hide-blacklisted-${tabValue}`}
-                      className="text-sm text-muted-foreground cursor-pointer select-none"
+                      className="text-xs sm:text-sm text-muted-foreground cursor-pointer select-none"
                     >
                       Hide blacklisted models
                     </label>
@@ -756,7 +758,7 @@ export default function Leaderboard() {
                     />
                     <label
                       htmlFor={`hide-base-models-${tabValue}`}
-                      className="text-sm text-muted-foreground cursor-pointer select-none"
+                      className="text-xs sm:text-sm text-muted-foreground cursor-pointer select-none"
                     >
                       Hide base models
                     </label>
