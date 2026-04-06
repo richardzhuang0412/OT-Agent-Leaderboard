@@ -32,6 +32,8 @@ export interface PivotedLeaderboardRowWithImprovement {
   // Duplicate tracking fields
   modelDuplicateOf: string | null;
   canonicalModelName: string;
+  agentDuplicateOf: string | null;
+  canonicalAgentName: string;
   canonicalBaseModelName: string;
   benchmarks: Record<string, {
     accuracy: number | null;

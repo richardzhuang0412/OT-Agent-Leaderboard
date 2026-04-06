@@ -51,6 +51,9 @@ SELECT
   COALESCE(bm_canonical.name, bm_via_canonical_canonical.name, COALESCE(bm.name, bm_via_canonical.name, 'None')) as canonical_base_model_name,
   a.name as agent_name,
   a.id as agent_id,
+  a.duplicate_of as agent_duplicate_of,
+  COALESCE(a_canonical.name, a.name) as canonical_agent_name,
+  COALESCE(a_canonical.id, a.id) as canonical_agent_id,
   -- Return CANONICAL benchmark name as primary identifier
   COALESCE(b_canonical.name, b.name) as benchmark_name,
   COALESCE(b.duplicate_of, b.id) as benchmark_id,
@@ -76,6 +79,7 @@ SELECT
   COALESCE(aj.is_overlong, false) as is_overlong
 FROM all_jobs aj
 INNER JOIN agents a ON aj.agent_id = a.id
+LEFT JOIN agents a_canonical ON a.duplicate_of = a_canonical.id
 INNER JOIN models m ON aj.model_id = m.id
 INNER JOIN benchmarks b ON aj.benchmark_id = b.id
 LEFT JOIN models bm ON m.base_model_id = bm.id
