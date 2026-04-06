@@ -45,6 +45,7 @@ export default function Leaderboard() {
   // Duplicate display controls (default: hide duplicates)
   const [showDuplicateBenchmarks, setShowDuplicateBenchmarks] = useState(false);
   const [showDuplicateModels, setShowDuplicateModels] = useState(false);
+  const [showDuplicateAgents, setShowDuplicateAgents] = useState(false);
   const [hideNoTraceLink, setHideNoTraceLink] = useState(false);
   const [hideBlacklisted, setHideBlacklisted] = useState(false);
   const [hideBaseModels, setHideBaseModels] = useState(false);
@@ -67,8 +68,12 @@ export default function Leaderboard() {
   }, [pivotedData, showDuplicateModels]);
 
   const availableAgents = useMemo(() => {
-    return Array.from(new Set(pivotedData.map((item) => item.agentName))).sort();
-  }, [pivotedData]);
+    let agents = pivotedData;
+    if (!showDuplicateAgents) {
+      agents = agents.filter(item => item.agentDuplicateOf === null);
+    }
+    return Array.from(new Set(agents.map((item) => item.agentName))).sort();
+  }, [pivotedData, showDuplicateAgents]);
 
   const availableEvalAgents = useMemo(() => {
     // Only known eval agents that actually appear in the data
@@ -453,6 +458,19 @@ export default function Leaderboard() {
               </div>
               <div className="flex items-center gap-2">
                 <Checkbox
+                  id="show-duplicate-agents"
+                  checked={showDuplicateAgents}
+                  onCheckedChange={(checked) => setShowDuplicateAgents(checked === true)}
+                />
+                <label
+                  htmlFor="show-duplicate-agents"
+                  className="text-xs sm:text-sm text-muted-foreground cursor-pointer select-none"
+                >
+                  Show duplicate agents
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
                   id="hide-no-trace-link"
                   checked={hideNoTraceLink}
                   onCheckedChange={(checked) => setHideNoTraceLink(checked === true)}
@@ -648,6 +666,7 @@ export default function Leaderboard() {
               }}
               showDuplicateBenchmarks={showDuplicateBenchmarks}
               showDuplicateModels={showDuplicateModels}
+              showDuplicateAgents={showDuplicateAgents}
               hideBlacklisted={hideBlacklisted}
               hideBaseModels={hideBaseModels}
             />
@@ -722,6 +741,19 @@ export default function Leaderboard() {
                       className="text-xs sm:text-sm text-muted-foreground cursor-pointer select-none"
                     >
                       Show duplicate models
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id={`show-duplicate-agents-${tabValue}`}
+                      checked={showDuplicateAgents}
+                      onCheckedChange={(checked) => setShowDuplicateAgents(checked === true)}
+                    />
+                    <label
+                      htmlFor={`show-duplicate-agents-${tabValue}`}
+                      className="text-xs sm:text-sm text-muted-foreground cursor-pointer select-none"
+                    >
+                      Show duplicate agents
                     </label>
                   </div>
                   <div className="flex items-center gap-2">
@@ -914,6 +946,7 @@ export default function Leaderboard() {
                 }}
                 showDuplicateBenchmarks={showDuplicateBenchmarks}
                 showDuplicateModels={showDuplicateModels}
+                showDuplicateAgents={showDuplicateAgents}
                 hideBlacklisted={hideBlacklisted}
                 hideBaseModels={hideBaseModels}
                 filterMissingEval={tabValue === 'missingEval'}
