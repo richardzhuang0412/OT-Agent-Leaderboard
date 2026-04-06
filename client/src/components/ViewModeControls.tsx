@@ -65,20 +65,20 @@ export default function ViewModeControls({
   };
 
   return (
-    <div className="bg-muted/30 rounded-md px-3 py-3">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-6 flex-wrap">
+    <div className="bg-muted/30 rounded-md px-2 py-2 sm:px-3 sm:py-3">
+      <div className="flex items-center justify-between flex-wrap gap-2 sm:gap-4">
+        <div className="flex items-center gap-3 sm:gap-6 flex-wrap">
           {/* Top N Performers Dropdown */}
-          <div className="flex items-center gap-3">
-            <Trophy className="w-4 h-4 text-muted-foreground" />
-            <label htmlFor="top-n-select" className="text-sm font-medium text-foreground">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <Trophy className="w-4 h-4 text-muted-foreground hidden sm:block" />
+            <label htmlFor="top-n-select" className="text-xs sm:text-sm font-medium text-foreground">
               Top
             </label>
             <Select
               value={getCurrentValueString(topN)}
               onValueChange={handleTopNChange}
             >
-              <SelectTrigger id="top-n-select" className="w-24">
+              <SelectTrigger id="top-n-select" className="w-20 sm:w-24">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -89,12 +89,12 @@ export default function ViewModeControls({
                 ))}
               </SelectContent>
             </Select>
-            <span className="text-sm font-medium text-foreground">Performers by</span>
+            <span className="text-xs sm:text-sm font-medium text-foreground">by</span>
             <Select
               value={topPerformerBenchmark}
               onValueChange={onTopPerformerBenchmarkChange}
             >
-              <SelectTrigger id="benchmark-select" className="w-64">
+              <SelectTrigger id="benchmark-select" className="w-40 sm:w-64">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -108,16 +108,16 @@ export default function ViewModeControls({
           </div>
 
           {/* N Most Recently Added Dropdown */}
-          <div className="flex items-center gap-3">
-            <CalendarPlus className="w-4 h-4 text-muted-foreground" />
-            <label htmlFor="recently-added-n-select" className="text-sm font-medium text-foreground">
-              N Most Recently Added:
+          <div className="flex items-center gap-2 sm:gap-3">
+            <CalendarPlus className="w-4 h-4 text-muted-foreground hidden sm:block" />
+            <label htmlFor="recently-added-n-select" className="text-xs sm:text-sm font-medium text-foreground">
+              <span className="hidden sm:inline">N Most </span>Recently Added:
             </label>
             <Select
               value={getCurrentValueString(recentlyAddedN)}
               onValueChange={handleRecentlyAddedNChange}
             >
-              <SelectTrigger id="recently-added-n-select" className="w-24">
+              <SelectTrigger id="recently-added-n-select" className="w-20 sm:w-24">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -131,16 +131,16 @@ export default function ViewModeControls({
           </div>
 
           {/* N Most Recently Eval'd Dropdown */}
-          <div className="flex items-center gap-3">
-            <Clock className="w-4 h-4 text-muted-foreground" />
-            <label htmlFor="recently-evaled-n-select" className="text-sm font-medium text-foreground">
-              N Most Recently Eval'd:
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Clock className="w-4 h-4 text-muted-foreground hidden sm:block" />
+            <label htmlFor="recently-evaled-n-select" className="text-xs sm:text-sm font-medium text-foreground">
+              <span className="hidden sm:inline">N Most </span>Recently Eval'd:
             </label>
             <Select
               value={getCurrentValueString(recentlyEvaledN)}
               onValueChange={handleRecentlyEvaledNChange}
             >
-              <SelectTrigger id="recently-evaled-n-select" className="w-24">
+              <SelectTrigger id="recently-evaled-n-select" className="w-20 sm:w-24">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

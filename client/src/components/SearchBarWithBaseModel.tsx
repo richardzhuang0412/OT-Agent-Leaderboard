@@ -23,7 +23,7 @@ export default function SearchBarWithBaseModel({
   onBenchmarkSearchChange,
 }: SearchBarWithBaseModelProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 w-full">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 w-full">
       <div className="flex items-center gap-2 min-w-0">
         <div className="relative min-w-0 flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />

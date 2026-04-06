@@ -863,6 +863,7 @@ export default function LeaderboardTableWithImprovement({
         <div
           ref={topScrollBarRef}
           onScroll={handleTopScrollBarScroll}
+          className="hidden sm:block"
           style={{
             height: '16px',
             backgroundColor: 'hsl(var(--muted))',
@@ -881,21 +882,21 @@ export default function LeaderboardTableWithImprovement({
           <table className="w-full">
             <thead className="bg-muted/50 sticky top-0 z-10">
               <tr className="border-b border-border">
-                <th className="sticky left-0 z-20 bg-muted/50 w-12 px-2 py-4 text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">#</th>
-                <th className="text-left px-6 py-4 min-w-[200px] sticky left-12 z-20 bg-muted/50">
+                <th className="sticky left-0 z-20 bg-muted/50 w-8 sm:w-12 px-1 sm:px-2 py-2 sm:py-4 text-center text-xs font-medium uppercase tracking-wide text-muted-foreground">#</th>
+                <th className="text-left px-2 sm:px-6 py-2 sm:py-4 min-w-[120px] sm:min-w-[200px] sticky left-8 sm:left-12 z-20 bg-muted/50">
                   <button
                     onClick={() => handleSort('modelName')}
-                    className="flex items-center gap-2 font-medium text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-2 px-2 py-1 rounded-md"
+                    className="flex items-center gap-1 sm:gap-2 font-medium text-xs sm:text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-1 sm:-mx-2 px-1 sm:px-2 py-1 rounded-md"
                     data-testid="button-sort-model"
                   >
                     Model Name
                     <SortIcon field="modelName" />
                   </button>
                 </th>
-                <th className="text-left px-6 py-4 min-w-[200px]">
+                <th className="text-left px-2 sm:px-6 py-2 sm:py-4 min-w-[100px] sm:min-w-[200px]">
                   <button
                     onClick={() => handleSort('agentName')}
-                    className="flex items-center gap-2 font-medium text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-2 px-2 py-1 rounded-md"
+                    className="flex items-center gap-1 sm:gap-2 font-medium text-xs sm:text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-1 sm:-mx-2 px-1 sm:px-2 py-1 rounded-md"
                     data-testid="button-sort-agent"
                   >
                     Agent Name
@@ -903,7 +904,7 @@ export default function LeaderboardTableWithImprovement({
                   </button>
                 </th>
                 {visibleBenchmarks.map(benchmark => (
-                  <th key={benchmark} className="text-right px-6 py-4 min-w-[220px]">
+                  <th key={benchmark} className="text-right px-2 sm:px-6 py-2 sm:py-4 min-w-[140px] sm:min-w-[220px]">
                     <div className="flex flex-col items-end gap-2">
                       <button
                         onClick={() => handleSort(benchmark)}
@@ -940,50 +941,50 @@ export default function LeaderboardTableWithImprovement({
                     </div>
                   </th>
                 ))}
-                <th className="text-left px-6 py-4 min-w-[200px]">
+                <th className="text-left px-2 sm:px-6 py-2 sm:py-4 min-w-[120px] sm:min-w-[200px]">
                   <button
                     onClick={() => handleSort('baseModelName')}
-                    className="flex items-center gap-2 font-medium text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-2 px-2 py-1 rounded-md"
+                    className="flex items-center gap-1 sm:gap-2 font-medium text-xs sm:text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-1 sm:-mx-2 px-1 sm:px-2 py-1 rounded-md"
                     data-testid="button-sort-basemodel"
                   >
                     Base Model
                     <SortIcon field="baseModelName" />
                   </button>
                 </th>
-                <th className="text-left px-6 py-4 min-w-[120px]">
+                <th className="text-left px-2 sm:px-6 py-2 sm:py-4 min-w-[80px] sm:min-w-[120px]">
                   <button
                     onClick={() => handleSort('trainingType')}
-                    className="flex items-center gap-2 font-medium text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-2 px-2 py-1 rounded-md"
+                    className="flex items-center gap-1 sm:gap-2 font-medium text-xs sm:text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-1 sm:-mx-2 px-1 sm:px-2 py-1 rounded-md"
                     data-testid="button-sort-trainingType"
                   >
                     Training Type
                     <SortIcon field="trainingType" />
                   </button>
                 </th>
-                <th className="text-left px-6 py-4 min-w-[180px]">
+                <th className="text-left px-2 sm:px-6 py-2 sm:py-4 min-w-[120px] sm:min-w-[180px]">
                   <button
                     onClick={() => handleSort('modelCreatedAt')}
-                    className="flex items-center gap-2 font-medium text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-2 px-2 py-1 rounded-md"
+                    className="flex items-center gap-1 sm:gap-2 font-medium text-xs sm:text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-1 sm:-mx-2 px-1 sm:px-2 py-1 rounded-md"
                     data-testid="button-sort-modelCreatedAt"
                   >
                     Model Added At (PT)
                     <SortIcon field="modelCreatedAt" />
                   </button>
                 </th>
-                <th className="text-left px-6 py-4 min-w-[180px]">
+                <th className="text-left px-2 sm:px-6 py-2 sm:py-4 min-w-[120px] sm:min-w-[180px]">
                   <button
                     onClick={() => handleSort('firstEvalEndedAt')}
-                    className="flex items-center gap-2 font-medium text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-2 px-2 py-1 rounded-md"
+                    className="flex items-center gap-1 sm:gap-2 font-medium text-xs sm:text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-1 sm:-mx-2 px-1 sm:px-2 py-1 rounded-md"
                     data-testid="button-sort-firstEvalEndedAt"
                   >
                     First Eval At (PT)
                     <SortIcon field="firstEvalEndedAt" />
                   </button>
                 </th>
-                <th className="text-left px-6 py-4 min-w-[180px]">
+                <th className="text-left px-2 sm:px-6 py-2 sm:py-4 min-w-[120px] sm:min-w-[180px]">
                   <button
                     onClick={() => handleSort('latestEvalEndedAt')}
-                    className="flex items-center gap-2 font-medium text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-2 px-2 py-1 rounded-md"
+                    className="flex items-center gap-1 sm:gap-2 font-medium text-xs sm:text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-1 sm:-mx-2 px-1 sm:px-2 py-1 rounded-md"
                     data-testid="button-sort-latestEvalEndedAt"
                   >
                     Latest Eval At (PT)
@@ -995,7 +996,7 @@ export default function LeaderboardTableWithImprovement({
             <tbody>
               {filteredAndSortedData.length === 0 ? (
                 <tr>
-                  <td colSpan={totalColumns} className="px-6 py-12 text-center text-muted-foreground">
+                  <td colSpan={totalColumns} className="px-4 sm:px-6 py-8 sm:py-12 text-center text-muted-foreground">
                     No results found
                   </td>
                 </tr>
@@ -1020,9 +1021,9 @@ export default function LeaderboardTableWithImprovement({
                       className={`border-b border-border hover-elevate ${rowBgClass}`}
                       data-testid={`row-result-${row.modelName}-${row.agentName}`}
                     >
-                      <td className={`sticky left-0 z-20 ${stickyCellBgClass} w-12 px-2 py-4 text-center text-xs text-muted-foreground font-mono`}>{index + 1}</td>
-                      <td className={`px-6 py-4 sticky left-12 z-20 ${stickyCellBgClass}`}>
-                        <span className="font-semibold text-foreground">{row.modelName}</span>
+                      <td className={`sticky left-0 z-20 ${stickyCellBgClass} w-8 sm:w-12 px-1 sm:px-2 py-2 sm:py-4 text-center text-xs text-muted-foreground font-mono`}>{index + 1}</td>
+                      <td className={`px-2 sm:px-6 py-2 sm:py-4 sticky left-8 sm:left-12 z-20 ${stickyCellBgClass}`}>
+                        <span className="font-semibold text-foreground text-xs sm:text-sm">{row.modelName}</span>
                         {row.modelSizeB != null && (
                           <span className={`ml-2 text-xs px-1.5 py-0.5 rounded font-mono font-medium ${modelSizeColor(row.modelSizeB)}`}>
                             {formatModelSize(row.modelSizeB)}
@@ -1038,36 +1039,36 @@ export default function LeaderboardTableWithImprovement({
                           {row.trainingType || 'Base'}
                         </span>
                       </td>
-                    <td className="px-6 py-4">
+                    <td className="px-2 sm:px-6 py-2 sm:py-4">
                       {row.isNoEval ? (
-                        <span className="text-red-500 font-semibold">NO EVAL</span>
+                        <span className="text-red-500 font-semibold text-xs sm:text-sm">NO EVAL</span>
                       ) : (
-                        <span className="text-muted-foreground">{row.agentName}</span>
+                        <span className="text-muted-foreground text-xs sm:text-sm">{row.agentName}</span>
                       )}
                     </td>
                       {visibleBenchmarks.map(benchmark => (
-                        <td key={benchmark} className="px-6 py-4 text-right">
+                        <td key={benchmark} className="px-2 sm:px-6 py-2 sm:py-4 text-right">
                           {formatBenchmarkCell(row.benchmarks[benchmark], benchmark)}
                         </td>
                       ))}
-                    <td className="px-6 py-4">
-                      <span className="text-muted-foreground">{row.baseModelName}</span>
+                    <td className="px-2 sm:px-6 py-2 sm:py-4">
+                      <span className="text-muted-foreground text-xs sm:text-sm">{row.baseModelName}</span>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="text-muted-foreground">{row.trainingType || '—'}</span>
+                    <td className="px-2 sm:px-6 py-2 sm:py-4">
+                      <span className="text-muted-foreground text-xs sm:text-sm">{row.trainingType || '—'}</span>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="text-muted-foreground font-mono text-sm">
+                    <td className="px-2 sm:px-6 py-2 sm:py-4">
+                      <span className="text-muted-foreground font-mono text-xs sm:text-sm">
                         {row.modelCreatedAt || '—'}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="text-muted-foreground font-mono text-sm">
+                    <td className="px-2 sm:px-6 py-2 sm:py-4">
+                      <span className="text-muted-foreground font-mono text-xs sm:text-sm">
                         {row.firstEvalEndedAt || '—'}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="text-muted-foreground font-mono text-sm">
+                    <td className="px-2 sm:px-6 py-2 sm:py-4">
+                      <span className="text-muted-foreground font-mono text-xs sm:text-sm">
                         {row.latestEvalEndedAt || '—'}
                       </span>
                     </td>
