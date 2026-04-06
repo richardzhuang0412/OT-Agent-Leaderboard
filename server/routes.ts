@@ -115,6 +115,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         modelDuplicateOf: string | null;
         canonicalModelName: string;
         canonicalBaseModelName: string;
+        agentDuplicateOf: string | null;
+        canonicalAgentName: string;
         benchmarks: Record<string, {
           accuracy: number | null;
           standardError: number | null;
@@ -164,6 +166,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             modelDuplicateOf: result.modelDuplicateOf,
             canonicalModelName: result.canonicalModelName,
             canonicalBaseModelName: result.canonicalBaseModelName,
+            agentDuplicateOf: result.agentDuplicateOf,
+            canonicalAgentName: result.canonicalAgentName,
             benchmarks: {}
           });
         }
@@ -293,6 +297,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           modelDuplicateOf: model.modelDuplicateOf,
           canonicalModelName: model.canonicalModelName,
           canonicalBaseModelName: model.canonicalBaseModelName,
+          agentDuplicateOf: null,
+          canonicalAgentName: 'NO EVAL',
           benchmarks: {}
         });
       }

@@ -29,6 +29,8 @@ export interface BenchmarkResultWithImprovement extends BenchmarkResultExtended 
   canonicalBaseModelName: string;
   benchmarkDuplicateOf: string | null;
   canonicalBenchmarkName: string;
+  agentDuplicateOf: string | null;
+  canonicalAgentName: string;
   // Source benchmark (tracks which actual benchmark the result came from after merging duplicates)
   sourceBenchmarkName: string;
   sourceBenchmarkId: string;
@@ -78,6 +80,9 @@ interface RawLeaderboardRow {
   canonical_base_model_name: string;
   agent_name: string;
   agent_id: string;
+  agent_duplicate_of: string | null;
+  canonical_agent_name: string;
+  canonical_agent_id: string;
   benchmark_name: string;
   benchmark_id: string;
   benchmark_duplicate_of: string | null;
@@ -198,12 +203,13 @@ export class DbStorage implements IStorage {
   }
 
   /**
-   * Build an index grouping raw rows by (agentId, modelId, canonicalBenchmark).
+   * Build an index grouping raw rows by (canonicalAgentId, modelId, canonicalBenchmark).
+   * Uses canonical agent ID to merge duplicate agent entries into the same pool.
    */
   private buildGroupIndex(rows: RawLeaderboardRow[]): Map<string, RawLeaderboardRow[]> {
     const index = new Map<string, RawLeaderboardRow[]>();
     for (const row of rows) {
-      const key = `${row.agent_id}|||${row.model_id}|||${row.benchmark_name}`;
+      const key = `${row.canonical_agent_id}|||${row.model_id}|||${row.benchmark_name}`;
       const pool = index.get(key);
       if (pool) {
         pool.push(row);
@@ -226,7 +232,7 @@ export class DbStorage implements IStorage {
       results.push({
         id: selected.id,
         modelName: selected.model_name,
-        agentName: selected.agent_name,
+        agentName: selected.canonical_agent_name ?? selected.agent_name,
         benchmarkName: selected.benchmark_name,
         accuracy: selected.accuracy ?? 0,
         standardError: selected.standard_error ?? 0,
@@ -376,7 +382,7 @@ export class DbStorage implements IStorage {
       results.push({
         id: selected.id,
         modelName: selected.model_name,
-        agentName: selected.agent_name,
+        agentName: selected.canonical_agent_name ?? selected.agent_name,
         benchmarkName: selected.benchmark_name,
         accuracy: selected.accuracy ?? 0,
         standardError: selected.standard_error ?? 0,
@@ -389,8 +395,10 @@ export class DbStorage implements IStorage {
         canonicalBenchmarkBaseModelAccuracy,
         canonicalBaseModelAccuracy,
         canonicalBothBaseModelAccuracy,
-        agentId: selected.agent_id,
+        agentId: selected.canonical_agent_id ?? selected.agent_id,
         benchmarkId: selected.benchmark_id,
+        agentDuplicateOf: selected.agent_duplicate_of ?? null,
+        canonicalAgentName: selected.canonical_agent_name ?? selected.agent_name,
         modelDuplicateOf: selected.model_duplicate_of ?? null,
         canonicalModelName: selected.canonical_model_name ?? selected.model_name,
         baseModelDuplicateOf: selected.base_model_duplicate_of ?? null,
