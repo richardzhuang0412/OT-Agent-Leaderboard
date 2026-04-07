@@ -60,6 +60,7 @@ export interface PivotedLeaderboardRowWithImprovement {
     // Job status for progress tracking
     jobStatus?: string | null;
     username?: string | null;
+    slurmJobId?: string | null;
     jobCreatedAt?: string;
     isOverlong?: boolean;
   }>;
@@ -712,6 +713,7 @@ export default function LeaderboardTableWithImprovement({
       autoSnapshot?: boolean;
       jobStatus?: string | null;
       username?: string | null;
+      slurmJobId?: string | null;
       jobCreatedAt?: string;
       isOverlong?: boolean;
     },
@@ -770,6 +772,11 @@ export default function LeaderboardTableWithImprovement({
             {benchmarkData.username && (
               <span className="font-mono text-[10px] text-muted-foreground truncate max-w-[100px]">
                 {benchmarkData.username}
+              </span>
+            )}
+            {benchmarkData.slurmJobId && (
+              <span className="font-mono text-[10px] text-muted-foreground truncate max-w-[100px]" title={`Slurm Job ID: ${benchmarkData.slurmJobId}`}>
+                slurm:{benchmarkData.slurmJobId}
               </span>
             )}
             {isStale && (
