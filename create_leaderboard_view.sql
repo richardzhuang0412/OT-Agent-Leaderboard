@@ -76,6 +76,7 @@ SELECT
   -- Job status and user info for progress tracking
   aj.job_status::text as job_status,
   aj.username as username,
+  aj.slurm_job_id as slurm_job_id,
   COALESCE(aj.is_overlong, false) as is_overlong
 FROM all_jobs aj
 INNER JOIN agents a ON aj.agent_id = a.id

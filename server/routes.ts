@@ -142,6 +142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Job status for progress tracking
           jobStatus: string | null;
           username: string | null;
+          slurmJobId: string | null;
           jobCreatedAt?: string;
           isOverlong: boolean;
         }>;
@@ -221,6 +222,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Job status for progress tracking
           jobStatus: result.jobStatus,
           username: result.username,
+          slurmJobId: result.slurmJobId,
           // Job timestamp (for pending/started: COALESCE(started_at, created_at))
           jobCreatedAt: result.endedAt,
           isOverlong: result.isOverlong,

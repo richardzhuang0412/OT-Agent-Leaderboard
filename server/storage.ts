@@ -48,6 +48,7 @@ export interface BenchmarkResultWithImprovement extends BenchmarkResultExtended 
   // Job status for progress tracking
   jobStatus: string | null;
   username: string | null;
+  slurmJobId: string | null;
   isOverlong: boolean;
 }
 
@@ -99,6 +100,7 @@ interface RawLeaderboardRow {
   model_size_b: number | null;
   job_status: string | null;
   username: string | null;
+  slurm_job_id: string | null;
   is_overlong: boolean;
 }
 
@@ -416,6 +418,7 @@ export class DbStorage implements IStorage {
         modelSizeB: selected.model_size_b ?? undefined,
         jobStatus: selected.job_status ?? null,
         username: selected.username ?? null,
+        slurmJobId: selected.slurm_job_id ?? null,
         isOverlong: selected.is_overlong ?? false,
       });
     }
