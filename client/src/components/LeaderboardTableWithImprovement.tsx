@@ -63,6 +63,11 @@ export interface PivotedLeaderboardRowWithImprovement {
     slurmJobId?: string | null;
     jobCreatedAt?: string;
     isOverlong?: boolean;
+    isIncomplete?: boolean;
+    isHighErrors?: boolean;
+    invalidErrorCount?: number;
+    completedTrials?: number;
+    totalTrials?: number;
   }>;
 }
 
@@ -716,6 +721,11 @@ export default function LeaderboardTableWithImprovement({
       slurmJobId?: string | null;
       jobCreatedAt?: string;
       isOverlong?: boolean;
+      isIncomplete?: boolean;
+      isHighErrors?: boolean;
+      invalidErrorCount?: number;
+      completedTrials?: number;
+      totalTrials?: number;
     },
     benchmarkName?: string
   ) => {
@@ -851,6 +861,24 @@ export default function LeaderboardTableWithImprovement({
             >
               <AlertTriangle className="w-3 h-3 mr-0.5" />
               Overlong
+            </span>
+          )}
+          {benchmarkData.isIncomplete && (
+            <span
+              className="inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold bg-orange-500/15 text-orange-500 border-orange-500/30"
+              title={`Incomplete: ${benchmarkData.completedTrials ?? '?'} of ${benchmarkData.totalTrials ?? '?'} trials attempted`}
+            >
+              <AlertTriangle className="w-3 h-3 mr-0.5" />
+              {benchmarkData.completedTrials ?? '?'}/{benchmarkData.totalTrials ?? '?'}
+            </span>
+          )}
+          {benchmarkData.isHighErrors && (
+            <span
+              className="inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30"
+              title={`${benchmarkData.invalidErrorCount} invalid errors (non-benign infra failures)`}
+            >
+              <AlertCircle className="w-3 h-3 mr-0.5" />
+              Errors: {benchmarkData.invalidErrorCount}
             </span>
           )}
         </div>

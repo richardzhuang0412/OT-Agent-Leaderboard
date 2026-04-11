@@ -145,6 +145,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           slurmJobId: string | null;
           jobCreatedAt?: string;
           isOverlong: boolean;
+          isIncomplete: boolean;
+          isHighErrors: boolean;
+          invalidErrorCount?: number;
+          completedTrials?: number;
+          totalTrials?: number;
         }>;
       }>();
 
@@ -226,6 +231,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Job timestamp (for pending/started: COALESCE(started_at, created_at))
           jobCreatedAt: result.endedAt,
           isOverlong: result.isOverlong,
+          isIncomplete: result.isIncomplete,
+          isHighErrors: result.isHighErrors,
+          invalidErrorCount: result.invalidErrorCount,
+          completedTrials: result.completedTrials,
+          totalTrials: result.totalTrials,
         };
       }
 
