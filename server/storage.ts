@@ -50,6 +50,11 @@ export interface BenchmarkResultWithImprovement extends BenchmarkResultExtended 
   username: string | null;
   slurmJobId: string | null;
   isOverlong: boolean;
+  isIncomplete: boolean;
+  isHighErrors: boolean;
+  invalidErrorCount?: number;
+  completedTrials?: number;
+  totalTrials?: number;
 }
 
 export interface ModelInfo {
@@ -102,6 +107,8 @@ interface RawLeaderboardRow {
   username: string | null;
   slurm_job_id: string | null;
   is_overlong: boolean;
+  stats: any;
+  n_trials: number | null;
 }
 
 const JOB_STATUS_PRIORITY: Record<string, number> = {
@@ -381,6 +388,40 @@ export class DbStorage implements IStorage {
       const autoSnapshotVal = config?.environment?.kwargs?.auto_snapshot;
       const autoSnapshot = autoSnapshotVal === true || autoSnapshotVal === 'true';
 
+      // Parse stats for guardrail flags (incomplete + high errors)
+      let stats = selected.stats;
+      if (typeof stats === 'string') {
+        try { stats = JSON.parse(stats); } catch { stats = undefined; }
+      }
+
+      const BENIGN_ERRORS = new Set([
+        'AgentTimeoutError', 'ContextLengthExceededError',
+        'SummarizationTimeout', 'SummarizationTimeoutError', 'BadRequestError',
+      ]);
+
+      let invalidErrorCount = 0;
+
+      if (stats?.evals) {
+        for (const evalData of Object.values(stats.evals) as any[]) {
+          // Count invalid (non-benign) errors
+          const exceptionStats = evalData.exception_stats ?? {};
+          for (const [errorType, trials] of Object.entries(exceptionStats)) {
+            if (Array.isArray(trials) && !BENIGN_ERRORS.has(errorType)) {
+              invalidErrorCount += trials.length;
+            }
+          }
+        }
+      }
+
+      // Incomplete = stats.n_trials < job.n_trials (not all trials attempted yet)
+      const statsNTrials = (stats?.n_trials as number) ?? undefined;
+      const jobNTrials = selected.n_trials ?? undefined;
+      const completedTrials = statsNTrials;
+      const totalTrials = jobNTrials;
+      const isIncomplete = (statsNTrials !== undefined && jobNTrials !== undefined && statsNTrials < jobNTrials)
+        || (statsNTrials === undefined && jobNTrials !== undefined && jobNTrials > 0);
+      const isHighErrors = invalidErrorCount > 10;
+
       results.push({
         id: selected.id,
         modelName: selected.model_name,
@@ -420,6 +461,11 @@ export class DbStorage implements IStorage {
         username: selected.username ?? null,
         slurmJobId: selected.slurm_job_id ?? null,
         isOverlong: selected.is_overlong ?? false,
+        isIncomplete,
+        isHighErrors,
+        invalidErrorCount: invalidErrorCount > 0 ? invalidErrorCount : undefined,
+        completedTrials,
+        totalTrials,
       });
     }
 
