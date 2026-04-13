@@ -310,11 +310,24 @@ export class DbStorage implements IStorage {
     const selectedRows: SelectedRow[] = [];
     for (const pool of Array.from(index.values())) {
       if (mode === 'all') {
-        // Sort pool by timestamp ascending for consistent ordering
+        // Sort: Finished by accuracy desc, then Started, then Pending (by timestamp desc within each group)
         const sorted = [...pool].sort((a, b) => {
+          const aFinished = a.job_status === 'Finished' || a.job_status === null;
+          const bFinished = b.job_status === 'Finished' || b.job_status === null;
+          const aHasAccuracy = aFinished && a.accuracy !== null;
+          const bHasAccuracy = bFinished && b.accuracy !== null;
+          // Finished with accuracy first, sorted by accuracy desc
+          if (aHasAccuracy && bHasAccuracy) return (b.accuracy ?? 0) - (a.accuracy ?? 0);
+          if (aHasAccuracy && !bHasAccuracy) return -1;
+          if (!aHasAccuracy && bHasAccuracy) return 1;
+          // Then by job status priority: Started > Pending
+          const aPri = JOB_STATUS_PRIORITY[a.job_status ?? 'Pending'] ?? 3;
+          const bPri = JOB_STATUS_PRIORITY[b.job_status ?? 'Pending'] ?? 3;
+          if (aPri !== bPri) return aPri - bPri;
+          // Within same status, latest first
           const tsA = a.ended_at ? new Date(a.ended_at).getTime() : 0;
           const tsB = b.ended_at ? new Date(b.ended_at).getTime() : 0;
-          return tsA - tsB;
+          return tsB - tsA;
         });
         sorted.forEach((row, idx) => {
           selectedRows.push({ ...row, resolvedAccuracy: row.accuracy ?? undefined, poolIndex: idx, poolSize: sorted.length });
