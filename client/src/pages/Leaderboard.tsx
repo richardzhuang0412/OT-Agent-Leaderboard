@@ -14,12 +14,13 @@ import ThemeToggle from '@/components/ThemeToggle';
 import { DEFAULT_VISIBLE_BENCHMARKS } from '@/config/benchmarkConfig';
 import { BLACKLISTED_MODELS } from '@/config/blacklistedModels';
 
-type EvalSelectionMode = 'oldest' | 'latest' | 'highest';
+type EvalSelectionMode = 'oldest' | 'latest' | 'highest' | 'all';
 
 const SELECTION_MODE_DESCRIPTIONS: Record<EvalSelectionMode, string> = {
   oldest: 'Shows the first valid evaluation (accuracy > 1%) per model/agent/benchmark, falling back to the earliest if none meet the threshold.',
   latest: 'Shows the most recent valid evaluation (accuracy > 1%) per model/agent/benchmark, falling back to the latest if none meet the threshold.',
   highest: 'Shows the highest accuracy evaluation per model/agent/benchmark.',
+  all: 'Shows all evaluations per cell. Use ◀ ▶ arrows to cycle through multiple results.',
 };
 
 const EVAL_AGENT_NAMES = new Set(['terminus-2', 'openhands', 'mini-swe-agent', 'swe-agent']);
@@ -369,6 +370,7 @@ export default function Leaderboard() {
             <ToggleGroupItem value="oldest">Oldest</ToggleGroupItem>
             <ToggleGroupItem value="latest">Latest</ToggleGroupItem>
             <ToggleGroupItem value="highest">Highest</ToggleGroupItem>
+            <ToggleGroupItem value="all">All</ToggleGroupItem>
           </ToggleGroup>
           <span className="hidden sm:inline text-xs text-muted-foreground max-w-md">
             {SELECTION_MODE_DESCRIPTIONS[selectionMode]}

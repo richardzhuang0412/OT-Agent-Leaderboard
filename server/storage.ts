@@ -3,7 +3,7 @@ import { supabase } from "@db";
 import { benchmarkResults } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
-export type EvalSelectionMode = 'oldest' | 'latest' | 'highest';
+export type EvalSelectionMode = 'oldest' | 'latest' | 'highest' | 'all';
 
 export interface BenchmarkResultExtended extends BenchmarkResult {
   hfTracesLink?: string;
@@ -55,6 +55,9 @@ export interface BenchmarkResultWithImprovement extends BenchmarkResultExtended 
   invalidErrorCount?: number;
   completedTrials?: number;
   totalTrials?: number;
+  // "All" mode: position in pool of results for same (model, agent, benchmark)
+  poolIndex?: number;
+  poolSize?: number;
 }
 
 export interface ModelInfo {
@@ -302,13 +305,25 @@ export class DbStorage implements IStorage {
     const index = this.buildGroupIndex(allRows);
     const benchmarkAliases = this.buildBenchmarkAliases(allRows);
 
-    // --- Pass 1: Select best result per (agent, model, benchmark) group ---
-    type SelectedRow = RawLeaderboardRow & { resolvedAccuracy: number | undefined };
+    // --- Pass 1: Select result(s) per (agent, model, benchmark) group ---
+    type SelectedRow = RawLeaderboardRow & { resolvedAccuracy: number | undefined; poolIndex?: number; poolSize?: number };
     const selectedRows: SelectedRow[] = [];
     for (const pool of Array.from(index.values())) {
-      const selected = selectResult(pool, mode);
-      if (!selected) continue;
-      selectedRows.push({ ...selected, resolvedAccuracy: selected.accuracy ?? undefined });
+      if (mode === 'all') {
+        // Sort pool by timestamp ascending for consistent ordering
+        const sorted = [...pool].sort((a, b) => {
+          const tsA = a.ended_at ? new Date(a.ended_at).getTime() : 0;
+          const tsB = b.ended_at ? new Date(b.ended_at).getTime() : 0;
+          return tsA - tsB;
+        });
+        sorted.forEach((row, idx) => {
+          selectedRows.push({ ...row, resolvedAccuracy: row.accuracy ?? undefined, poolIndex: idx, poolSize: sorted.length });
+        });
+      } else {
+        const selected = selectResult(pool, mode);
+        if (!selected) continue;
+        selectedRows.push({ ...selected, resolvedAccuracy: selected.accuracy ?? undefined });
+      }
     }
 
     // --- Pass 2: Build resolved accuracy map ---
@@ -466,6 +481,8 @@ export class DbStorage implements IStorage {
         invalidErrorCount: invalidErrorCount > 0 ? invalidErrorCount : undefined,
         completedTrials,
         totalTrials,
+        poolIndex: selected.poolIndex,
+        poolSize: selected.poolSize,
       });
     }
 

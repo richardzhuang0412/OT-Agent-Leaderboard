@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { ChevronUp, ChevronDown, ChevronsUpDown, ExternalLink, AlertCircle, AlertTriangle, Download } from 'lucide-react';
+import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, ExternalLink, AlertCircle, AlertTriangle, Download } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { BLACKLISTED_MODELS } from '@/config/blacklistedModels';
 import { DEFAULT_VISIBLE_BENCHMARKS } from '@/config/benchmarkConfig';
@@ -68,6 +68,36 @@ export interface PivotedLeaderboardRowWithImprovement {
     invalidErrorCount?: number;
     completedTrials?: number;
     totalTrials?: number;
+    // "All" mode: array of all results for cycling through
+    allResults?: Array<{
+      accuracy: number | null;
+      standardError: number | null;
+      hfTracesLink?: string;
+      baseModelAccuracy?: number;
+      improvement?: number;
+      canonicalBenchmarkBaseModelAccuracy?: number;
+      canonicalBaseModelAccuracy?: number;
+      canonicalBothBaseModelAccuracy?: number;
+      benchmarkDuplicateOf: string | null;
+      canonicalBenchmarkName: string;
+      sourceBenchmarkName?: string;
+      sourceBenchmarkId?: string;
+      timeoutMultiplier?: number;
+      daytonaOverrideCpus?: number;
+      daytonaOverrideMemoryMb?: number;
+      daytonaOverrideStorageMb?: number;
+      autoSnapshot?: boolean;
+      jobStatus?: string | null;
+      username?: string | null;
+      slurmJobId?: string | null;
+      jobCreatedAt?: string;
+      isOverlong?: boolean;
+      isIncomplete?: boolean;
+      isHighErrors?: boolean;
+      invalidErrorCount?: number;
+      completedTrials?: number;
+      totalTrials?: number;
+    }>;
   }>;
 }
 
@@ -138,6 +168,8 @@ export default function LeaderboardTableWithImprovement({
   const [sortField, setSortField] = useState<SortField>('modelCreatedAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [sortModePerBenchmark, setSortModePerBenchmark] = useState<Record<string, SortMode>>({});
+  // "All" mode: tracks which result index is currently displayed per cell
+  const [cellResultIndex, setCellResultIndex] = useState<Record<string, number>>({});
   const tableScrollContainerRef = useRef<HTMLDivElement>(null);
   const topScrollBarRef = useRef<HTMLDivElement>(null);
 
@@ -1143,11 +1175,46 @@ export default function LeaderboardTableWithImprovement({
                         <span className="text-muted-foreground text-xs sm:text-sm">{row.agentName}</span>
                       )}
                     </td>
-                      {visibleBenchmarks.map(benchmark => (
-                        <td key={benchmark} className="px-1 py-2 text-right sm:px-6 sm:py-4">
-                          {formatBenchmarkCell(row.benchmarks[benchmark], benchmark)}
-                        </td>
-                      ))}
+                      {visibleBenchmarks.map(benchmark => {
+                        const cellData = row.benchmarks[benchmark];
+                        const allResults = cellData?.allResults;
+                        const hasMultiple = allResults && allResults.length > 1;
+                        const cellKey = `${row.modelName}|||${row.agentName}|||${benchmark}`;
+                        const currentIdx = cellResultIndex[cellKey] ?? 0;
+                        const displayData = hasMultiple ? { ...cellData, ...allResults[currentIdx] } : cellData;
+                        return (
+                          <td key={benchmark} className="px-1 py-2 text-right sm:px-6 sm:py-4">
+                            {hasMultiple ? (
+                              <div className="flex items-center gap-0.5">
+                                <div className="flex flex-col items-center gap-0.5 mr-1">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setCellResultIndex(prev => ({ ...prev, [cellKey]: (currentIdx - 1 + allResults.length) % allResults.length })); }}
+                                    className="text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-muted/50 transition-colors leading-none"
+                                    title="Previous result"
+                                  >
+                                    <ChevronLeft className="w-3 h-3" />
+                                  </button>
+                                  <span className="text-[9px] font-mono text-muted-foreground whitespace-nowrap">
+                                    {currentIdx + 1}/{allResults.length}
+                                  </span>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setCellResultIndex(prev => ({ ...prev, [cellKey]: (currentIdx + 1) % allResults.length })); }}
+                                    className="text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-muted/50 transition-colors leading-none"
+                                    title="Next result"
+                                  >
+                                    <ChevronRight className="w-3 h-3" />
+                                  </button>
+                                </div>
+                                <div className="flex-1">
+                                  {formatBenchmarkCell(displayData, benchmark)}
+                                </div>
+                              </div>
+                            ) : (
+                              formatBenchmarkCell(cellData, benchmark)
+                            )}
+                          </td>
+                        );
+                      })}
                     <td className="hidden sm:table-cell px-2 sm:px-6 py-2 sm:py-4">
                       <span className="text-muted-foreground text-xs sm:text-sm">{row.baseModelName}</span>
                     </td>

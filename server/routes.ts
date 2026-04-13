@@ -90,7 +90,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Validate and parse eval selection mode
       const modeParam = req.query.mode as string | undefined;
-      const validModes: EvalSelectionMode[] = ['oldest', 'latest', 'highest'];
+      const validModes: EvalSelectionMode[] = ['oldest', 'latest', 'highest', 'all'];
       const mode: EvalSelectionMode = modeParam && validModes.includes(modeParam as EvalSelectionMode)
         ? modeParam as EvalSelectionMode
         : 'oldest';
@@ -150,6 +150,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           invalidErrorCount?: number;
           completedTrials?: number;
           totalTrials?: number;
+          // "All" mode: array of all results for cycling
+          allResults?: Array<Record<string, any>>;
         }>;
       }>();
 
@@ -202,7 +204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ? result.accuracy - effectiveBaseModelAccuracy
           : undefined;
 
-        group.benchmarks[result.benchmarkName] = {
+        const benchmarkEntry = {
           accuracy,
           standardError,
           hfTracesLink: result.hfTracesLink,
@@ -237,6 +239,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           completedTrials: result.completedTrials,
           totalTrials: result.totalTrials,
         };
+
+        if (mode === 'all') {
+          // In "all" mode, accumulate results into allResults array
+          const existing = group.benchmarks[result.benchmarkName];
+          if (existing) {
+            if (!existing.allResults) {
+              existing.allResults = [{ ...existing }];
+              delete existing.allResults[0].allResults;
+            }
+            existing.allResults.push(benchmarkEntry);
+          } else {
+            group.benchmarks[result.benchmarkName] = { ...benchmarkEntry, allResults: [benchmarkEntry] };
+          }
+        } else {
+          group.benchmarks[result.benchmarkName] = benchmarkEntry;
+        }
       }
 
       // Fetch all registered models to backfill training agent info and add NO EVAL rows
