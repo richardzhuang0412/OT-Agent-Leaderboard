@@ -55,7 +55,7 @@ const TABLE_1_MODELS = new Set([
 
 export default function Leaderboard() {
   const [selectionMode, setSelectionMode] = useState<EvalSelectionMode>('highest');
-  const [activeTab, setActiveTab] = useState<'filtered' | 'all' | 'blacklisted' | 'base' | 'active' | 'a1' | 'b1' | 'c1' | 'd1' | 'e1' | 'table1' | 'baselineData' | 'missingEval' | 'guardrail'>('all');
+  const [activeTab, setActiveTab] = useState<'filtered' | 'all' | 'blacklisted' | 'base' | 'active' | 'a1' | 'b1' | 'c1' | 'd1' | 'e1' | 'f1' | 'g1' | 'table1' | 'baselineData' | 'missingEval' | 'guardrail'>('all');
   const [topN, setTopN] = useState<number>(50);
   const [recentlyAddedN, setRecentlyAddedN] = useState<number>(50);
   const [recentlyEvaledN, setRecentlyEvaledN] = useState<number>(50);
@@ -291,6 +291,10 @@ export default function Leaderboard() {
         return pivotedData.filter(row => row.modelName.startsWith('DCAgent/d1_'));
       case 'e1':
         return pivotedData.filter(row => row.modelName.startsWith('DCAgent/e1_'));
+      case 'f1':
+        return pivotedData.filter(row => row.modelName.startsWith('DCAgent/f1_'));
+      case 'g1':
+        return pivotedData.filter(row => row.modelName.startsWith('DCAgent/g1_'));
       case 'table1':
         return pivotedData.filter(row => TABLE_1_MODELS.has(row.modelName));
       case 'guardrail':
@@ -422,6 +426,8 @@ export default function Leaderboard() {
               <TabsTrigger value="c1" className="text-xs sm:text-sm bg-teal-500/15 text-teal-700 dark:text-teal-300 data-[state=active]:bg-teal-500/30">C1</TabsTrigger>
               <TabsTrigger value="d1" className="text-xs sm:text-sm bg-amber-500/15 text-amber-700 dark:text-amber-300 data-[state=active]:bg-amber-500/30">D1</TabsTrigger>
               <TabsTrigger value="e1" className="text-xs sm:text-sm bg-rose-500/15 text-rose-700 dark:text-rose-300 data-[state=active]:bg-rose-500/30">E1</TabsTrigger>
+              <TabsTrigger value="f1" className="text-xs sm:text-sm bg-pink-500/15 text-pink-700 dark:text-pink-300 data-[state=active]:bg-pink-500/30">F1</TabsTrigger>
+              <TabsTrigger value="g1" className="text-xs sm:text-sm bg-violet-500/15 text-violet-700 dark:text-violet-300 data-[state=active]:bg-violet-500/30">G1</TabsTrigger>
               <TabsTrigger value="table1" className="text-xs sm:text-sm bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 data-[state=active]:bg-indigo-500/30">Table 1</TabsTrigger>
               <TabsTrigger value="baselineData" className="text-xs sm:text-sm bg-purple-500/15 text-purple-700 dark:text-purple-300 data-[state=active]:bg-purple-500/30">Baseline Data</TabsTrigger>
               <TabsTrigger value="missingEval" className="text-xs sm:text-sm bg-red-500/15 text-red-700 dark:text-red-300 data-[state=active]:bg-red-500/30">Missing Eval</TabsTrigger>
@@ -731,7 +737,7 @@ export default function Leaderboard() {
           </TabsContent>
 
           {/* Shared content for all non-filtered tabs */}
-          {(['all', 'base', 'a1', 'b1', 'c1', 'd1', 'e1', 'table1', 'baselineData', 'missingEval', 'guardrail', 'active', 'blacklisted'] as const).map(tabValue => (
+          {(['all', 'base', 'a1', 'b1', 'c1', 'd1', 'e1', 'f1', 'g1', 'table1', 'baselineData', 'missingEval', 'guardrail', 'active', 'blacklisted'] as const).map(tabValue => (
             <TabsContent key={tabValue} value={tabValue} className="space-y-6">
               <SearchBarWithBaseModel
                 modelSearch={modelSearch}
