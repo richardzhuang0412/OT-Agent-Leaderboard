@@ -20,6 +20,7 @@ export const OOD_BENCHMARKS = [
   'medagentbench',
   'gaia_127',
   'financeagent_terminal',
+  'swebench-verified',
 ];
 
 export type BenchmarkCategory = 'core' | 'ood' | 'other';
