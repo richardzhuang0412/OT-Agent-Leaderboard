@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { classifyBenchmark, type BenchmarkCategory } from '@/config/benchmarkConfig';
 
 interface FilterControlsWithBaseModelProps {
   availableModels: string[];
@@ -461,7 +462,7 @@ export default function FilterControlsWithBaseModel({
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" data-testid="button-filter-benchmarks">
               <Filter className="w-4 h-4 mr-2" />
-              Benchmark Columns
+              Benchmarks
               {selectedBenchmarks.length > 0 && (
                 <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-xs">
                   {selectedBenchmarks.length}
@@ -501,22 +502,50 @@ export default function FilterControlsWithBaseModel({
                 {filteredBenchmarks.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-2 text-center">No matches found</p>
                 ) : (
-                  filteredBenchmarks.map((benchmark) => (
-                    <div key={benchmark} className="flex items-center gap-2">
-                      <Checkbox
-                        id={`benchmark-${benchmark}`}
-                        checked={selectedBenchmarks.includes(benchmark)}
-                        onCheckedChange={() => toggleBenchmark(benchmark)}
-                        data-testid={`checkbox-benchmark-${benchmark}`}
-                      />
-                      <Label
-                        htmlFor={`benchmark-${benchmark}`}
-                        className="text-sm cursor-pointer flex-1"
-                      >
-                        {benchmark}
-                      </Label>
-                    </div>
-                  ))
+                  (['core', 'ood', 'other'] as BenchmarkCategory[]).map((category, idx) => {
+                    const groupBenchmarks = filteredBenchmarks.filter(b => classifyBenchmark(b) === category);
+                    if (groupBenchmarks.length === 0) return null;
+                    const selectedInGroup = groupBenchmarks.filter(b => selectedBenchmarks.includes(b));
+                    const allSelected = selectedInGroup.length === groupBenchmarks.length;
+                    const label = category === 'core' ? 'Core' : category === 'ood' ? 'OOD' : 'Other';
+                    const selectAll = () => {
+                      const toAdd = groupBenchmarks.filter(b => !selectedBenchmarks.includes(b));
+                      onBenchmarksChange([...selectedBenchmarks, ...toAdd]);
+                    };
+                    const deselectAll = () => {
+                      onBenchmarksChange(selectedBenchmarks.filter(b => !groupBenchmarks.includes(b)));
+                    };
+                    return (
+                      <div key={category}>
+                        {idx > 0 && <div className="border-t border-border my-2" />}
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}</p>
+                          <button
+                            onClick={allSelected ? deselectAll : selectAll}
+                            className="text-[10px] text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                          >
+                            {allSelected ? 'Deselect all' : 'Select all'}
+                          </button>
+                        </div>
+                        {groupBenchmarks.map((benchmark) => (
+                          <div key={benchmark} className="flex items-center gap-2">
+                            <Checkbox
+                              id={`benchmark-${benchmark}`}
+                              checked={selectedBenchmarks.includes(benchmark)}
+                              onCheckedChange={() => toggleBenchmark(benchmark)}
+                              data-testid={`checkbox-benchmark-${benchmark}`}
+                            />
+                            <Label
+                              htmlFor={`benchmark-${benchmark}`}
+                              className="text-sm cursor-pointer flex-1"
+                            >
+                              {benchmark}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>
