@@ -60,6 +60,8 @@ const WAR_MODELS = new Set([
   'DCAgent/g1_min_episodes_e1_gpt_long_tacc',
   'Qwen/Qwen3-8B',
   'Qwen/Qwen3-32B',
+  'laion/nemosci-tasrep-a1mfc-dev1-maxeps-swes-r2eg-32b__Qwen3-32B',
+  'laion/nemosci-tasrep-a1mfc-gfistaqc-dev1-scaff-maxeps-swes-r2eg-32b__Qwen3-32B',
 ]);
 
 export default function Leaderboard() {
