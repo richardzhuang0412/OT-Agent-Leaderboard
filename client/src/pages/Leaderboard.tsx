@@ -65,7 +65,7 @@ const WAR_MODELS = new Set([
 ]);
 
 export default function Leaderboard() {
-  const [selectionMode, setSelectionMode] = useState<EvalSelectionMode>('highest');
+  const [selectionMode, setSelectionMode] = useState<EvalSelectionMode>('all');
   const [activeTab, setActiveTab] = useState<'filtered' | 'all' | 'blacklisted' | 'base' | 'active' | 'a1' | 'b1' | 'c1' | 'd1' | 'e1' | 'f1' | 'g1' | 'ood' | 'war' | 'table1' | 'baselineData' | 'missingEval' | 'guardrail'>('all');
   const [topN, setTopN] = useState<number>(50);
   const [recentlyAddedN, setRecentlyAddedN] = useState<number>(50);
