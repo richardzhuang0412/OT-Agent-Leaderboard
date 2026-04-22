@@ -55,6 +55,8 @@ export interface BenchmarkResultWithImprovement extends BenchmarkResultExtended 
   invalidErrorCount?: number;
   completedTrials?: number;
   totalTrials?: number;
+  // Free-text note recorded alongside the job
+  notes?: string;
   // "All" mode: position in pool of results for same (model, agent, benchmark)
   poolIndex?: number;
   poolSize?: number;
@@ -112,6 +114,7 @@ interface RawLeaderboardRow {
   is_overlong: boolean;
   stats: any;
   n_trials: number | null;
+  notes: string | null;
 }
 
 const JOB_STATUS_PRIORITY: Record<string, number> = {
@@ -494,6 +497,7 @@ export class DbStorage implements IStorage {
         invalidErrorCount: invalidErrorCount > 0 ? invalidErrorCount : undefined,
         completedTrials,
         totalTrials,
+        notes: selected.notes ?? undefined,
         poolIndex: selected.poolIndex,
         poolSize: selected.poolSize,
       });

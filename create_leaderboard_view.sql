@@ -79,7 +79,8 @@ SELECT
   aj.slurm_job_id as slurm_job_id,
   COALESCE(aj.is_overlong, false) as is_overlong,
   aj.stats as stats,
-  aj.n_trials as n_trials
+  aj.n_trials as n_trials,
+  aj.notes as notes
 FROM all_jobs aj
 INNER JOIN agents a ON aj.agent_id = a.id
 LEFT JOIN agents a_canonical ON a.duplicate_of = a_canonical.id

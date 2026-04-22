@@ -150,6 +150,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           invalidErrorCount?: number;
           completedTrials?: number;
           totalTrials?: number;
+          // Free-text note from the job
+          notes?: string;
           // "All" mode: array of all results for cycling
           allResults?: Array<Record<string, any>>;
         }>;
@@ -238,6 +240,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           invalidErrorCount: result.invalidErrorCount,
           completedTrials: result.completedTrials,
           totalTrials: result.totalTrials,
+          notes: result.notes,
         };
 
         if (mode === 'all') {

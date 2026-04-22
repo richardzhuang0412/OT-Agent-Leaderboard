@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, ExternalLink, AlertCircle, AlertTriangle, Download } from 'lucide-react';
+import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, ExternalLink, AlertCircle, AlertTriangle, Download, StickyNote } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { BLACKLISTED_MODELS } from '@/config/blacklistedModels';
 import { DEFAULT_VISIBLE_BENCHMARKS } from '@/config/benchmarkConfig';
@@ -68,6 +68,8 @@ export interface PivotedLeaderboardRowWithImprovement {
     invalidErrorCount?: number;
     completedTrials?: number;
     totalTrials?: number;
+    // Free-text note from the job
+    notes?: string;
     // "All" mode: array of all results for cycling through
     allResults?: Array<{
       accuracy: number | null;
@@ -97,6 +99,7 @@ export interface PivotedLeaderboardRowWithImprovement {
       invalidErrorCount?: number;
       completedTrials?: number;
       totalTrials?: number;
+      notes?: string;
     }>;
   }>;
 }
@@ -764,6 +767,7 @@ export default function LeaderboardTableWithImprovement({
       invalidErrorCount?: number;
       completedTrials?: number;
       totalTrials?: number;
+      notes?: string;
     },
     benchmarkName?: string
   ) => {
@@ -917,6 +921,15 @@ export default function LeaderboardTableWithImprovement({
             >
               <AlertCircle className="w-3 h-3 mr-0.5" />
               Errors: {benchmarkData.invalidErrorCount}
+            </span>
+          )}
+          {benchmarkData.notes && (
+            <span
+              className="inline-flex items-start gap-1 text-[10px] leading-snug rounded-md border px-1.5 py-1 bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30 text-left break-words max-w-[5.5rem]"
+              title={benchmarkData.notes}
+            >
+              <StickyNote className="w-3 h-3 shrink-0 mt-[1px]" />
+              <span className="break-words">{benchmarkData.notes}</span>
             </span>
           )}
         </div>
