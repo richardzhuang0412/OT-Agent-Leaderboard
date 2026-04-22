@@ -562,6 +562,17 @@ export default function LeaderboardTableWithImprovement({
     // Sort the data
     if (sortDirection && sortField) {
       filtered = [...filtered].sort((a, b) => {
+        // Helper: final tiebreaker keeps rows for the same model adjacent,
+        // then sub-ordered by agent name for deterministic order within a group.
+        const groupTiebreak = () => {
+          if (sortField !== 'modelName' && a.modelName !== b.modelName) {
+            return a.modelName.localeCompare(b.modelName);
+          }
+          if (sortField !== 'agentName' && a.agentName !== b.agentName) {
+            return a.agentName.localeCompare(b.agentName);
+          }
+          return 0;
+        };
         let aVal: string | number | Date | undefined;
         let bVal: string | number | Date | undefined;
 
@@ -607,25 +618,20 @@ export default function LeaderboardTableWithImprovement({
         }
 
         // Handle undefined/null values (missing benchmark data, Pending/Started, or timestamp)
-        if (aVal === undefined && bVal === undefined) return 0;
+        if (aVal === undefined && bVal === undefined) return groupTiebreak();
         if (aVal === undefined) return 1;
         if (bVal === undefined) return -1;
 
+        let cmp = 0;
         if (typeof aVal === 'string' && typeof bVal === 'string') {
-          return sortDirection === 'asc'
-            ? aVal.localeCompare(bVal)
-            : bVal.localeCompare(aVal);
+          cmp = sortDirection === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+        } else if (typeof aVal === 'number' && typeof bVal === 'number') {
+          cmp = sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+        } else if (aVal instanceof Date && bVal instanceof Date) {
+          cmp = sortDirection === 'asc' ? aVal.getTime() - bVal.getTime() : bVal.getTime() - aVal.getTime();
         }
 
-        if (typeof aVal === 'number' && typeof bVal === 'number') {
-          return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
-        }
-
-        if (aVal instanceof Date && bVal instanceof Date) {
-          return sortDirection === 'asc' ? aVal.getTime() - bVal.getTime() : bVal.getTime() - aVal.getTime();
-        }
-
-        return 0;
+        return cmp !== 0 ? cmp : groupTiebreak();
       });
     }
 
@@ -1133,6 +1139,11 @@ export default function LeaderboardTableWithImprovement({
                 filteredAndSortedData.map((row, index) => {
                   const isBaseModel = row.baseModelName === 'None';
                   const isBlacklisted = BLACKLISTED_MODELS.has(row.modelName);
+                  const prevRow = index > 0 ? filteredAndSortedData[index - 1] : undefined;
+                  const nextRow = index < filteredAndSortedData.length - 1 ? filteredAndSortedData[index + 1] : undefined;
+                  const isGroupContinuation = prevRow?.modelName === row.modelName;
+                  const isGroupStart = !isGroupContinuation && nextRow?.modelName === row.modelName;
+                  const isInGroup = isGroupContinuation || isGroupStart;
                   const rowBgClass = isBaseModel
                     ? 'bg-blue-100 dark:bg-blue-900/60'
                     : isBlacklisted
@@ -1143,30 +1154,38 @@ export default function LeaderboardTableWithImprovement({
                     : isBlacklisted
                       ? 'bg-neutral-200 dark:bg-neutral-800/70'
                       : 'bg-background';
+                  const rowBorderClass = isGroupContinuation ? 'border-t-0' : 'border-t border-border';
+                  const bottomBorderClass = (nextRow && nextRow.modelName === row.modelName) ? '' : 'border-b border-border';
 
                   return (
                     <tr
                       key={`${row.modelName}-${row.agentName}`}
-                      className={`border-b border-border hover-elevate ${rowBgClass}`}
+                      className={`${rowBorderClass} ${bottomBorderClass} hover-elevate ${rowBgClass}`}
                       data-testid={`row-result-${row.modelName}-${row.agentName}`}
                     >
-                      <td className={`w-8 px-1 py-2 text-center text-xs text-muted-foreground font-mono sm:sticky sm:left-0 sm:z-20 sm:w-12 sm:px-2 sm:py-4 ${stickyCellBgClass}`}>{index + 1}</td>
-                      <td className={`px-2 py-2 sm:sticky sm:left-12 sm:z-20 sm:px-6 sm:py-4 ${stickyCellBgClass}`}>
-                        <span className="font-semibold text-foreground text-xs sm:text-sm">{row.modelName}</span>
-                        {row.modelSizeB != null && (
-                          <span className={`ml-2 text-xs px-1.5 py-0.5 rounded font-mono font-medium ${modelSizeColor(row.modelSizeB)}`}>
-                            {formatModelSize(row.modelSizeB)}
-                          </span>
+                      <td className={`w-8 px-1 py-2 text-center text-xs text-muted-foreground font-mono sm:sticky sm:left-0 sm:z-20 sm:w-12 sm:px-2 sm:py-4 ${stickyCellBgClass}`}>{isGroupContinuation ? '' : index + 1}</td>
+                      <td className={`px-2 py-2 sm:sticky sm:left-12 sm:z-20 sm:px-6 sm:py-4 ${stickyCellBgClass} ${isInGroup ? 'border-l-2 border-l-primary/40' : ''}`}>
+                        {isGroupContinuation ? (
+                          <span className="text-muted-foreground/50 text-xs sm:text-sm pl-3">↳</span>
+                        ) : (
+                          <>
+                            <span className="font-semibold text-foreground text-xs sm:text-sm">{row.modelName}</span>
+                            {row.modelSizeB != null && (
+                              <span className={`ml-2 text-xs px-1.5 py-0.5 rounded font-mono font-medium ${modelSizeColor(row.modelSizeB)}`}>
+                                {formatModelSize(row.modelSizeB)}
+                              </span>
+                            )}
+                            <span className={`ml-1 text-xs px-1.5 py-0.5 rounded font-medium ${
+                              row.trainingType === 'SFT'
+                                ? 'bg-lime-100 text-lime-800 dark:bg-lime-900 dark:text-lime-200'
+                                : row.trainingType === 'RL'
+                                  ? 'bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200'
+                                  : 'bg-stone-200 text-stone-700 dark:bg-stone-700 dark:text-stone-200'
+                            }`}>
+                              {row.trainingType || 'Base'}
+                            </span>
+                          </>
                         )}
-                        <span className={`ml-1 text-xs px-1.5 py-0.5 rounded font-medium ${
-                          row.trainingType === 'SFT'
-                            ? 'bg-lime-100 text-lime-800 dark:bg-lime-900 dark:text-lime-200'
-                            : row.trainingType === 'RL'
-                              ? 'bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200'
-                              : 'bg-stone-200 text-stone-700 dark:bg-stone-700 dark:text-stone-200'
-                        }`}>
-                          {row.trainingType || 'Base'}
-                        </span>
                       </td>
                     <td className="px-1 py-2 sm:px-6 sm:py-4">
                       {row.isNoEval ? (
@@ -1181,7 +1200,7 @@ export default function LeaderboardTableWithImprovement({
                         const hasMultiple = allResults && allResults.length > 1;
                         const cellKey = `${row.modelName}|||${row.agentName}|||${benchmark}`;
                         const currentIdx = cellResultIndex[cellKey] ?? 0;
-                        const displayData = hasMultiple ? { ...cellData, ...allResults[currentIdx] } : cellData;
+                        const displayData = hasMultiple ? allResults[currentIdx] : cellData;
                         return (
                           <td key={benchmark} className="px-1 py-2 text-right sm:px-6 sm:py-4">
                             {hasMultiple ? (
