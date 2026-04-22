@@ -313,11 +313,11 @@ export class DbStorage implements IStorage {
     const selectedRows: SelectedRow[] = [];
     for (const pool of Array.from(index.values())) {
       if (mode === 'all') {
-        // Sort purely by submission time, ascending (oldest first)
+        // Sort purely by submission time, descending (latest first)
         const sorted = [...pool].sort((a, b) => {
           const tsA = a.ended_at ? new Date(a.ended_at).getTime() : 0;
           const tsB = b.ended_at ? new Date(b.ended_at).getTime() : 0;
-          return tsA - tsB;
+          return tsB - tsA;
         });
         sorted.forEach((row, idx) => {
           selectedRows.push({ ...row, resolvedAccuracy: row.accuracy ?? undefined, poolIndex: idx, poolSize: sorted.length });
