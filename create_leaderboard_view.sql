@@ -72,7 +72,8 @@ SELECT
   -- Eval config and training type metadata
   aj.config as config,
   m.training_type as training_type,
-  m.model_size_b as model_size_b,
+  -- Fall back to the base model's size when the model itself has no explicit size
+  COALESCE(m.model_size_b, bm.model_size_b, bm_via_canonical.model_size_b) as model_size_b,
   -- Job status and user info for progress tracking
   aj.job_status::text as job_status,
   aj.username as username,
