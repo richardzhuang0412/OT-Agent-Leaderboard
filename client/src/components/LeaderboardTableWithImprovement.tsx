@@ -769,7 +769,8 @@ export default function LeaderboardTableWithImprovement({
       totalTrials?: number;
       notes?: string;
     },
-    benchmarkName?: string
+    benchmarkName?: string,
+    rowBaseModelName?: string
   ) => {
     if (!benchmarkData) {
       return <span className="text-muted-foreground text-sm">—</span>;
@@ -947,10 +948,20 @@ export default function LeaderboardTableWithImprovement({
               ±{benchmarkData.standardError.toFixed(2)}
             </span>
           ) : null}
-          {benchmarkData.improvement !== undefined && (
+          {benchmarkData.improvement !== undefined ? (
             <span className={`font-mono text-xs ${isOverlong ? 'text-red-500 font-bold' : `font-medium ${getImprovementColor(benchmarkData.improvement)}`}`}>
               {benchmarkData.improvement >= 0 ? '+' : ''}{benchmarkData.improvement.toFixed(2)} pp
             </span>
+          ) : (
+            benchmarkData.accuracy != null && rowBaseModelName && rowBaseModelName !== 'None' && (
+              <span
+                className="inline-flex items-center gap-0.5 font-mono text-[10px] text-amber-600 dark:text-amber-400"
+                title={`No base model score — ${rowBaseModelName} has not been evaluated on this benchmark with the same agent`}
+              >
+                <AlertTriangle className="w-3 h-3" />
+                no base
+              </span>
+            )
           )}
         </div>
       </div>
@@ -1238,11 +1249,11 @@ export default function LeaderboardTableWithImprovement({
                                   </button>
                                 </div>
                                 <div className="flex-1">
-                                  {formatBenchmarkCell(displayData, benchmark)}
+                                  {formatBenchmarkCell(displayData, benchmark, row.baseModelName)}
                                 </div>
                               </div>
                             ) : (
-                              formatBenchmarkCell(cellData, benchmark)
+                              formatBenchmarkCell(cellData, benchmark, row.baseModelName)
                             )}
                           </td>
                         );

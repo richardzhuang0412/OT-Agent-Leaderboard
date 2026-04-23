@@ -330,11 +330,10 @@ export class DbStorage implements IStorage {
     }
 
     // --- Pass 2: Build resolved accuracy map ---
-    // Key: canonicalModelName|||benchmarkName → accuracy
-    // Merges all duplicate model entries and benchmark aliases into one canonical accuracy.
-    // This means if model ID A (name "Qwen/Qwen3-8B") was evaluated with agent X on benchmark B,
-    // and model ID C (name "hosted_vllm/Qwen/Qwen3-8B", duplicate of A) was evaluated with agent Y
-    // on benchmark B, both contribute to the resolved accuracy for "Qwen/Qwen3-8B" on B.
+    // Key: canonicalModelName|||canonicalAgentName|||benchmarkName → accuracy
+    // Improvement is now scoped to the same (agent, benchmark) pair so a trained
+    // model's score is compared against its base model *under the same agent*,
+    // not the base model's best score across all agents.
     const resolvedAccuracy = new Map<string, number>();
 
     for (const row of selectedRows) {
@@ -346,6 +345,10 @@ export class DbStorage implements IStorage {
       const stripped = row.model_name.replace(/^hosted_vllm\//, '');
       if (stripped !== row.model_name) modelNames.add(stripped);
 
+      const agentNames = new Set<string>();
+      agentNames.add(row.agent_name);
+      if (row.canonical_agent_name) agentNames.add(row.canonical_agent_name);
+
       const bmNames = new Set<string>();
       bmNames.add(row.benchmark_name);
       if (row.canonical_benchmark_name) bmNames.add(row.canonical_benchmark_name);
@@ -353,31 +356,33 @@ export class DbStorage implements IStorage {
       if (aliases) aliases.forEach(a => bmNames.add(a));
 
       modelNames.forEach(mn => {
-        bmNames.forEach(bn => {
-          const key = `${mn}|||${bn}`;
-          const existing = resolvedAccuracy.get(key);
-          if (existing === undefined || row.resolvedAccuracy! > existing) {
-            resolvedAccuracy.set(key, row.resolvedAccuracy!);
-          }
+        agentNames.forEach(an => {
+          bmNames.forEach(bn => {
+            const key = `${mn}|||${an}|||${bn}`;
+            const existing = resolvedAccuracy.get(key);
+            if (existing === undefined || row.resolvedAccuracy! > existing) {
+              resolvedAccuracy.set(key, row.resolvedAccuracy!);
+            }
+          });
         });
       });
     }
 
     // --- Pass 3: Compute improvement using resolved accuracy map ---
-    const lookupResolved = (baseModelName: string | undefined, benchmarkName: string): number | undefined => {
+    const lookupResolved = (baseModelName: string | undefined, agentName: string, benchmarkName: string): number | undefined => {
       if (!baseModelName || baseModelName === 'None') return undefined;
 
-      const direct = resolvedAccuracy.get(`${baseModelName}|||${benchmarkName}`);
+      const direct = resolvedAccuracy.get(`${baseModelName}|||${agentName}|||${benchmarkName}`);
       if (direct !== undefined) return direct;
 
       const strippedName = baseModelName.replace(/^hosted_vllm\//, '');
       if (strippedName !== baseModelName) {
-        const strippedResult = resolvedAccuracy.get(`${strippedName}|||${benchmarkName}`);
+        const strippedResult = resolvedAccuracy.get(`${strippedName}|||${agentName}|||${benchmarkName}`);
         if (strippedResult !== undefined) return strippedResult;
       }
 
       const prefixed = `hosted_vllm/${baseModelName}`;
-      const prefixedResult = resolvedAccuracy.get(`${prefixed}|||${benchmarkName}`);
+      const prefixedResult = resolvedAccuracy.get(`${prefixed}|||${agentName}|||${benchmarkName}`);
       if (prefixedResult !== undefined) return prefixedResult;
 
       return undefined;
@@ -386,9 +391,11 @@ export class DbStorage implements IStorage {
     const results: BenchmarkResultWithImprovement[] = [];
 
     for (const selected of selectedRows) {
-      const baseModelAccuracy = lookupResolved(selected.base_model_name, selected.benchmark_name);
+      const agentForLookup = selected.canonical_agent_name ?? selected.agent_name;
+      const baseModelAccuracy = lookupResolved(selected.base_model_name, agentForLookup, selected.benchmark_name);
       const canonicalBaseModelAccuracy = lookupResolved(
         selected.canonical_base_model_name ?? selected.base_model_name,
+        agentForLookup,
         selected.benchmark_name
       );
       const canonicalBenchmarkBaseModelAccuracy = baseModelAccuracy;
