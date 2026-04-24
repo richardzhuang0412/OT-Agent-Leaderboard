@@ -11,7 +11,7 @@ import SearchBarWithBaseModel from '@/components/SearchBarWithBaseModel';
 import FilterControlsWithBaseModel from '@/components/FilterControlsWithBaseModel';
 import ViewModeControls from '@/components/ViewModeControls';
 import ThemeToggle from '@/components/ThemeToggle';
-import { DEFAULT_VISIBLE_BENCHMARKS, OOD_BENCHMARKS, CORE_BENCHMARKS } from '@/config/benchmarkConfig';
+import { DEFAULT_VISIBLE_BENCHMARKS, OOD_BENCHMARKS, CORE_BENCHMARKS, compareBenchmarks } from '@/config/benchmarkConfig';
 import { BLACKLISTED_MODELS } from '@/config/blacklistedModels';
 
 type EvalSelectionMode = 'oldest' | 'latest' | 'highest' | 'all';
@@ -25,44 +25,114 @@ const SELECTION_MODE_DESCRIPTIONS: Record<EvalSelectionMode, string> = {
 
 const EVAL_AGENT_NAMES = new Set(['terminus-2', 'openhands', 'mini-swe-agent', 'swe-agent']);
 
-const TABLE_1_MODELS = new Set([
-  'Lite-Coder/LiteCoder-Terminal-30b-a3b-sft',
-  'Lite-Coder/LiteCoder-Terminal-4b-sft',
-  'zai-org/GLM-4.7-Flash',
-  'open-thoughts/OpenThinker-Agent-v1',
-  'camel-ai/seta-rl-qwen3-8b',
-  'nvidia/Nemotron-Terminal-32B',
-  'nvidia/Nemotron-Terminal-14B',
-  'nvidia/Nemotron-Terminal-8B',
-  'obiwan96/qwen3-8b-openthinker-sft-endless-terminals',
-  'open-thoughts/OpenThinker3-7B',
-  'nvidia/Llama-3.1-Nemotron-Nano-8B-v1',
-  'deepseek-ai/DeepSeek-R1-Distill-Qwen-7B',
-  'Qwen/Qwen2.5-Coder-32B-Instruct',
-  'SWE-bench/SWE-agent-LM-32B',
-  'Skywork/Skywork-SWE-32B',
-  'R2E-Gym/R2EGym-32B-Agent',
-  'NovaSky-AI/SA-SWE-32B',
-  'SWE-Swiss/SWE-Swiss-32B',
-  'SWE-bench/SWE-agent-LM-7B',
-  'Qwen/Qwen3-Coder-30B-A3B-Instruct',
-  'nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16',
-  'allenai/SERA-32B',
-  'allenai/SERA-8B',
-  'Qwen/Qwen3-8B',
-  'Qwen/Qwen3-32B',
-]);
+const TABLE_1_SECTIONS: Array<{ label: string; models: string[] }> = [
+  {
+    label: '~8B Scale',
+    models: [
+      'Qwen/Qwen3-8B',
+      'allenai/SERA-8B',
+      'SWE-bench/SWE-agent-LM-7B',
+      'nvidia/Nemotron-Terminal-8B',
+      'camel-ai/seta-rl-qwen3-8b',
+      'open-thoughts/OpenThinker-Agent-v1',
+      'obiwan96/qwen3-8b-openthinker-sft-endless-terminals',
+      'nvidia/Llama-3.1-Nemotron-Nano-8B-v1',
+      'deepseek-ai/DeepSeek-R1-Distill-Qwen-7B',
+      'open-thoughts/OpenThinker3-7B',
+      'SWE-Lego/SWE-Lego-Qwen3-8B',
+    ],
+  },
+  {
+    label: '~32B Scale',
+    models: [
+      'Qwen/Qwen3-32B',
+      'Lite-Coder/LiteCoder-Terminal-30b-a3b-sft',
+      'Qwen/Qwen3-30B-A3B-Instruct-2507',
+      'allenai/SERA-32B',
+      'nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16',
+      'Qwen/Qwen3-Coder-30B-A3B-Instruct',
+      'SWE-bench/SWE-agent-LM-32B',
+      'nvidia/Nemotron-Terminal-32B',
+      'nvidia/Nemotron-Terminal-14B',
+      'zai-org/GLM-4.7-Flash',
+      'NovaSky-AI/SA-SWE-32B',
+      'R2E-Gym/R2EGym-32B-Agent',
+      'Skywork/Skywork-SWE-32B',
+      'Qwen/Qwen2.5-Coder-32B-Instruct',
+      'GAIR/OpenSWE-32B',
+      'GAIR/daVinci-Dev-32B',
+      'SWE-Lego/SWE-Lego-Qwen3-32B',
+    ],
+  },
+  {
+    label: 'Larger / Closed-Source',
+    models: [
+      'Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8',
+      'Qwen/Qwen3-235B-A22B-Instruct-2507-tput',
+      'moonshotai/Kimi-K2.5',
+      'zai-org/GLM-4.7',
+    ],
+  },
+  {
+    label: 'Qwen3.5',
+    models: [
+      'Qwen/Qwen3.5-9B',
+      'Qwen/Qwen3.5-27B',
+    ],
+  },
+];
 
-const WAR_MODELS = new Set([
-  'nvidia/Nemotron-Terminal-32B',
-  'nvidia/Nemotron-Terminal-8B',
-  'DCAgent/g1_min_episodes_e1_gpt_long_thinking_tacc-Qwen3-32B',
-  'DCAgent/g1_min_episodes_e1_gpt_long_tacc',
-  'Qwen/Qwen3-8B',
-  'Qwen/Qwen3-32B',
-  'laion/nemosci-tasrep-a1mfc-dev1-maxeps-swes-r2eg-32b__Qwen3-32B',
-  'laion/nemosci-tasrep-a1mfc-gfistaqc-dev1-scaff-maxeps-swes-r2eg-32b__Qwen3-32B',
-]);
+const TABLE_1_ORDER: string[] = TABLE_1_SECTIONS.flatMap(s => s.models);
+const TABLE_1_MODELS = new Set<string>(TABLE_1_ORDER);
+const TABLE_1_SECTION_BY_MODEL: Record<string, string> = TABLE_1_SECTIONS.reduce((acc, s) => {
+  s.models.forEach(m => { acc[m] = s.label; });
+  return acc;
+}, {} as Record<string, string>);
+
+const WAR_SECTIONS: Array<{ label: string; models: string[] }> = [
+  {
+    label: '~32B Scale',
+    models: [
+      'laion/nemotron-terminal-corpus-unified-100000__Qwen3-32B',
+      'laion/nemosci-tasrep-a1mfc-gfistaqc-scaff-maxeps-swes-r2eg-32b__Qwen3-32B',
+      'laion/nemosci-tasrep-nemodebug-a1mfc-gfistaqc-scaff-maxeps-swes-r2eg-32b__Qwen3-32B',
+      'laion/nemosci-tasrep-a1mfc-gfistaqc-dev1-scaff-maxeps-swes-r2eg-32b__Qwen3-32B',
+      'nvidia/Nemotron-Terminal-32B',
+      'laion/nemotron-terminal-corpus-unified-31600__Qwen3-32B',
+      'DCAgent/g1_diverse_tezos_100k_32b_step900',
+      'DCAgent/g1_min_episodes_e1_gpt_long_thinking_tacc-Qwen3-32B',
+      'DCAgent/g1_weighted_100k_32B_step4400',
+      'laion/nemosci-tasrep-a1mfc-dev1-maxeps-swes-r2eg-32b__Qwen3-32B',
+      'DCAgent/g1_min_episodes_e1_gpt_long_sampled_swesmith_psu_thinking_tacc-Qwen3-32B',
+      'DCAgent/g1_weighted_31600_32B',
+      'DCAgent/g1_timeout_e1_gpt_long_sampled_swesmith_psu_thinking_tacc-Qwen3-32B',
+      'DCAgent/g1_timeout_e1_gpt_long_thinking_tacc-Qwen3-32B',
+      'DCAgent/g1_weighted_100k_32B_step2800',
+    ],
+  },
+  {
+    label: '~8B Scale',
+    models: [
+      'laion/nemosci-tasrep-a1mfc-dev1-maxeps__Qwen3-8B',
+      'laion/100k_wd0__Qwen3-8B',
+      'nvidia/Nemotron-Terminal-8B',
+      'laion/nemosci-tasrep-a1mfc-gfistaqc-dev1-scaff-maxeps-swes-r2eg__Qwen3-8B',
+      'DCAgent/g1_weighted_100k_8b_v2',
+      'DCAgent/g1_weighted_31600_8b_orig',
+      'laion/100k_wd1e-3__Qwen3-8B',
+      'DCAgent/g1_min_episodes_e1_gpt_long_tacc',
+      'DCAgent/g1_timeout_e1_gpt_long',
+      'laion/nemosci-tasrep-a1mfc-gfistaqc-dev1-scaff-maxeps__Qwen3-8B',
+    ],
+  },
+];
+
+const WAR_ORDER: string[] = WAR_SECTIONS.flatMap(s => s.models);
+const WAR_MODELS = new Set<string>(WAR_ORDER);
+const WAR_SECTION_BY_MODEL: Record<string, string> = WAR_SECTIONS.reduce((acc, s) => {
+  s.models.forEach(m => { acc[m] = s.label; });
+  return acc;
+}, {} as Record<string, string>);
 
 export default function Leaderboard() {
   const [selectionMode, setSelectionMode] = useState<EvalSelectionMode>('all');
@@ -164,7 +234,7 @@ export default function Leaderboard() {
         }
       });
     });
-    return Array.from(benchmarkSet).sort();
+    return Array.from(benchmarkSet).sort(compareBenchmarks);
   }, [pivotedData, showDuplicateBenchmarks]);
 
   // Build a map of duplicate benchmark -> canonical benchmark from the data
@@ -437,9 +507,12 @@ export default function Leaderboard() {
           if (newTab === 'ood') {
             const validOOD = OOD_BENCHMARKS.filter(b => availableBenchmarks.includes(b));
             if (validOOD.length > 0) setSelectedBenchmarks(validOOD);
-          } else if (newTab === 'war') {
+          } else if (newTab === 'war' || newTab === 'table1') {
             const validBenchmarks = [...CORE_BENCHMARKS, ...OOD_BENCHMARKS].filter(b => availableBenchmarks.includes(b));
             if (validBenchmarks.length > 0) setSelectedBenchmarks(validBenchmarks);
+          } else {
+            const validCore = CORE_BENCHMARKS.filter(b => availableBenchmarks.includes(b));
+            if (validCore.length > 0) setSelectedBenchmarks(validCore);
           }
         }}>
           <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
@@ -1041,6 +1114,16 @@ export default function Leaderboard() {
                 hideBlacklisted={hideBlacklisted}
                 hideBaseModels={hideBaseModels}
                 filterMissingEval={tabValue === 'missingEval'}
+                customOrder={
+                  tabValue === 'table1' ? TABLE_1_ORDER :
+                  tabValue === 'war' ? WAR_ORDER :
+                  undefined
+                }
+                sectionByModel={
+                  tabValue === 'table1' ? TABLE_1_SECTION_BY_MODEL :
+                  tabValue === 'war' ? WAR_SECTION_BY_MODEL :
+                  undefined
+                }
               />
             </TabsContent>
           ))}

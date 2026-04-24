@@ -1,8 +1,8 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, Fragment } from 'react';
 import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, ExternalLink, AlertCircle, AlertTriangle, Download, StickyNote } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { BLACKLISTED_MODELS } from '@/config/blacklistedModels';
-import { DEFAULT_VISIBLE_BENCHMARKS } from '@/config/benchmarkConfig';
+import { DEFAULT_VISIBLE_BENCHMARKS, compareBenchmarks, classifyBenchmark } from '@/config/benchmarkConfig';
 
 // Hide scrollbar while keeping scroll functionality
 const scrollbarHidingStyles = `
@@ -129,6 +129,12 @@ interface LeaderboardTableWithImprovementProps {
   hideBlacklisted?: boolean;
   // When true, hide base models (baseModelName === 'None')
   hideBaseModels?: boolean;
+  // When provided, rows are sorted by this list's index (models not in the list go to the end).
+  // Overrides the default sort; column sort still works if the user clicks a header.
+  customOrder?: string[];
+  // When provided with customOrder, a section header row is inserted when the section changes.
+  // Keys are model names, values are section labels.
+  sectionByModel?: Record<string, string>;
 }
 
 type SortField = 'modelName' | 'agentName' | 'baseModelName' | 'trainingType' | 'modelCreatedAt' | 'firstEvalEndedAt' | 'latestEvalEndedAt' | string; // string for dynamic benchmark names
@@ -166,10 +172,26 @@ export default function LeaderboardTableWithImprovement({
   showDuplicateAgents,
   filterMissingEval,
   hideBlacklisted,
-  hideBaseModels
+  hideBaseModels,
+  customOrder,
+  sectionByModel
 }: LeaderboardTableWithImprovementProps) {
-  const [sortField, setSortField] = useState<SortField>('modelCreatedAt');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const hasCustomOrder = !!customOrder && customOrder.length > 0;
+  const [sortField, setSortField] = useState<SortField>(hasCustomOrder ? 'modelName' : 'modelCreatedAt');
+  const [sortDirection, setSortDirection] = useState<SortDirection>(hasCustomOrder ? null : 'desc');
+  // Reset sort when entering / leaving custom-order mode so the custom order takes effect on tab switch.
+  const customOrderKey = hasCustomOrder ? customOrder!.join('|') : '';
+  useEffect(() => {
+    if (hasCustomOrder) {
+      setSortField('modelName');
+      setSortDirection(null);
+    }
+  }, [customOrderKey, hasCustomOrder]);
+  const customOrderIndex = useMemo(() => {
+    const map = new Map<string, number>();
+    if (customOrder) customOrder.forEach((m, i) => map.set(m, i));
+    return map;
+  }, [customOrder]);
   const [sortModePerBenchmark, setSortModePerBenchmark] = useState<Record<string, SortMode>>({});
   // "All" mode: tracks which result index is currently displayed per cell
   const [cellResultIndex, setCellResultIndex] = useState<Record<string, number>>({});
@@ -434,13 +456,14 @@ export default function LeaderboardTableWithImprovement({
     return processed;
   }, [data, showDuplicateModels, showDuplicateAgents, showDuplicateBenchmarks, benchmarkDuplicateMap]);
 
-  // Get all unique benchmark names from the processed data
+  // Get all unique benchmark names from the processed data.
+  // Order: Core → OOD → Other (alphabetical within Other).
   const allBenchmarks = useMemo(() => {
     const benchmarkSet = new Set<string>();
     processedData.forEach(row => {
       Object.keys(row.benchmarks).forEach(benchmark => benchmarkSet.add(benchmark));
     });
-    return Array.from(benchmarkSet).sort();
+    return Array.from(benchmarkSet).sort(compareBenchmarks);
   }, [processedData]);
 
   // Filter which benchmark columns to show based on search, filters, and duplicate settings
@@ -465,6 +488,34 @@ export default function LeaderboardTableWithImprovement({
 
     return visible;
   }, [allBenchmarks, benchmarkSearch, filters.benchmarks, showDuplicateBenchmarks, benchmarkDuplicateMap]);
+
+  // Benchmark names that begin a new category group (used to draw a left divider between groups).
+  // Skips the very first visible column since the Agent Name cell already provides that border.
+  const categoryBoundarySet = useMemo(() => {
+    const boundaries = new Set<string>();
+    for (let i = 1; i < visibleBenchmarks.length; i++) {
+      if (classifyBenchmark(visibleBenchmarks[i]) !== classifyBenchmark(visibleBenchmarks[i - 1])) {
+        boundaries.add(visibleBenchmarks[i]);
+      }
+    }
+    return boundaries;
+  }, [visibleBenchmarks]);
+
+  // First benchmark of each Core / OOD group — labelled in the header as a category chip.
+  // "Other" is intentionally left unlabelled to avoid visual clutter.
+  const categoryLabelByBenchmark = useMemo(() => {
+    const map = new Map<string, string>();
+    let lastCategory: string | null = null;
+    for (const b of visibleBenchmarks) {
+      const c = classifyBenchmark(b);
+      if (c !== lastCategory) {
+        if (c === 'core') map.set(b, 'Core');
+        else if (c === 'ood') map.set(b, 'OOD');
+        lastCategory = c;
+      }
+    }
+    return map;
+  }, [visibleBenchmarks]);
 
   // Filter and sort the processed data (after duplicate handling)
   const filteredAndSortedData = useMemo(() => {
@@ -562,6 +613,18 @@ export default function LeaderboardTableWithImprovement({
       });
     }
 
+    // Custom order (used by Table 1 tab): sort by customOrder index with agent-name tiebreaker.
+    // Takes effect when no user-initiated column sort is active.
+    if (hasCustomOrder && !sortDirection) {
+      filtered = [...filtered].sort((a, b) => {
+        const ai = customOrderIndex.get(a.modelName) ?? Number.MAX_SAFE_INTEGER;
+        const bi = customOrderIndex.get(b.modelName) ?? Number.MAX_SAFE_INTEGER;
+        if (ai !== bi) return ai - bi;
+        if (a.modelName !== b.modelName) return a.modelName.localeCompare(b.modelName);
+        return a.agentName.localeCompare(b.agentName);
+      });
+    }
+
     // Sort the data
     if (sortDirection && sortField) {
       filtered = [...filtered].sort((a, b) => {
@@ -639,7 +702,7 @@ export default function LeaderboardTableWithImprovement({
     }
 
     return filtered;
-  }, [processedData, modelSearch, agentSearch, baseModelSearch, filters, sortField, sortDirection, sortModePerBenchmark, filterMissingEval, hideBlacklisted, hideBaseModels]);
+  }, [processedData, modelSearch, agentSearch, baseModelSearch, filters, sortField, sortDirection, sortModePerBenchmark, filterMissingEval, hideBlacklisted, hideBaseModels, hasCustomOrder, customOrderIndex]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -1062,9 +1125,23 @@ export default function LeaderboardTableWithImprovement({
                     <SortIcon field="agentName" />
                   </button>
                 </th>
-                {visibleBenchmarks.map(benchmark => (
-                  <th key={benchmark} className="text-right px-1 py-2 min-w-[70px] sm:px-6 sm:py-4 sm:min-w-[220px]">
+                {visibleBenchmarks.map(benchmark => {
+                  const categoryLabel = categoryLabelByBenchmark.get(benchmark);
+                  return (
+                  <th key={benchmark} className={`text-right px-1 py-2 min-w-[70px] sm:px-6 sm:py-4 sm:min-w-[220px] ${categoryBoundarySet.has(benchmark) ? 'border-l-4 border-muted-foreground/50' : ''}`}>
                     <div className="flex flex-col items-end gap-1 sm:gap-2">
+                      {categoryLabel && (
+                        <span
+                          className={`self-start text-[10px] sm:text-xs font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                            categoryLabel === 'Core'
+                              ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                              : 'bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300'
+                          }`}
+                          data-testid={`benchmark-category-${categoryLabel.toLowerCase()}`}
+                        >
+                          {categoryLabel}
+                        </span>
+                      )}
                       <button
                         onClick={() => handleSort(benchmark)}
                         className="flex items-center gap-1 sm:gap-2 font-medium text-[10px] sm:text-sm uppercase tracking-wide hover-elevate active-elevate-2 -mx-1 sm:-mx-2 px-1 sm:px-2 py-1 rounded-md"
@@ -1099,7 +1176,8 @@ export default function LeaderboardTableWithImprovement({
                       </div>
                     </div>
                   </th>
-                ))}
+                  );
+                })}
                 <th className="hidden sm:table-cell text-left px-2 sm:px-6 py-2 sm:py-4 min-w-[120px] sm:min-w-[200px]">
                   <button
                     onClick={() => handleSort('baseModelName')}
@@ -1165,6 +1243,12 @@ export default function LeaderboardTableWithImprovement({
                   const isBlacklisted = BLACKLISTED_MODELS.has(row.modelName);
                   const prevRow = index > 0 ? filteredAndSortedData[index - 1] : undefined;
                   const nextRow = index < filteredAndSortedData.length - 1 ? filteredAndSortedData[index + 1] : undefined;
+                  // Section header insertion (Table 1 tab): render before the first row of each section.
+                  // Only when custom order is in effect (sortDirection === null), otherwise header would scatter.
+                  const showSectionHeaders = hasCustomOrder && !sortDirection && !!sectionByModel;
+                  const currentSection = showSectionHeaders ? sectionByModel![row.modelName] : undefined;
+                  const prevSection = showSectionHeaders && prevRow ? sectionByModel![prevRow.modelName] : undefined;
+                  const isSectionStart = showSectionHeaders && !!currentSection && currentSection !== prevSection;
                   const isGroupContinuation = prevRow?.modelName === row.modelName;
                   const isGroupStart = !isGroupContinuation && nextRow?.modelName === row.modelName;
                   const isInGroup = isGroupContinuation || isGroupStart;
@@ -1182,8 +1266,19 @@ export default function LeaderboardTableWithImprovement({
                   const bottomBorderClass = (nextRow && nextRow.modelName === row.modelName) ? '' : 'border-b border-border';
 
                   return (
+                    <Fragment key={`${row.modelName}-${row.agentName}`}>
+                      {isSectionStart && (
+                        <tr className="bg-muted/60 border-t-2 border-primary/40">
+                          <td
+                            colSpan={totalColumns}
+                            className="px-2 sm:px-6 py-2 text-xs sm:text-sm font-bold uppercase tracking-wider text-foreground sm:sticky sm:left-0 sm:z-20 bg-muted/60"
+                            data-testid={`row-section-${currentSection}`}
+                          >
+                            {currentSection}
+                          </td>
+                        </tr>
+                      )}
                     <tr
-                      key={`${row.modelName}-${row.agentName}`}
                       className={`${rowBorderClass} ${bottomBorderClass} hover-elevate ${rowBgClass}`}
                       data-testid={`row-result-${row.modelName}-${row.agentName}`}
                     >
@@ -1226,7 +1321,7 @@ export default function LeaderboardTableWithImprovement({
                         const currentIdx = cellResultIndex[cellKey] ?? 0;
                         const displayData = hasMultiple ? allResults[currentIdx] : cellData;
                         return (
-                          <td key={benchmark} className="px-1 py-2 text-right sm:px-6 sm:py-4">
+                          <td key={benchmark} className={`px-1 py-2 text-right sm:px-6 sm:py-4 ${categoryBoundarySet.has(benchmark) ? 'border-l-4 border-muted-foreground/50' : ''}`}>
                             {hasMultiple ? (
                               <div className="flex items-center gap-0.5">
                                 <div className="flex flex-col items-center gap-0.5 mr-1">
@@ -1280,6 +1375,7 @@ export default function LeaderboardTableWithImprovement({
                       </span>
                     </td>
                     </tr>
+                    </Fragment>
                   );
                 })
               )}
