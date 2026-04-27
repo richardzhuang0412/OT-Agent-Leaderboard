@@ -19,8 +19,8 @@ export const OOD_BENCHMARKS = [
   'aider_polyglot',
   'bfcl-parity',
   'medagentbench',
-  'swebench-verified',
   'gaia_127',
+  'swebench-verified',
   'financeagent_terminal',
 ];
 
