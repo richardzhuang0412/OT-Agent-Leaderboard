@@ -800,6 +800,10 @@ export default function Leaderboard() {
                   <span>Daytona sandbox with auto-snapshot enabled</span>
                 </div>
                 <div className="flex items-center gap-2">
+                  <span className="font-mono text-[10px] rounded-full px-2 py-0.5 border whitespace-nowrap bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30">D: snapshot_old</span>
+                  <span>Snapshot eval run before resource config change on 2026-04-13</span>
+                </div>
+                <div className="flex items-center gap-2">
                   <span className="font-mono text-[10px] rounded-full px-2 py-0.5 border bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/25">D: 4/8/32</span>
                   <span>Daytona sandbox overrides: CPUs / Memory (GB) / Storage (GB). "x" = not overridden</span>
                 </div>

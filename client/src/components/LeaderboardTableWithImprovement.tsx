@@ -947,19 +947,40 @@ export default function LeaderboardTableWithImprovement({
           }`}>
             T:{benchmarkData.timeoutMultiplier != null ? `${benchmarkData.timeoutMultiplier}x` : 'N/A'}
           </span>
-          <span className={`font-mono text-[10px] rounded-full px-2 py-0.5 border whitespace-nowrap ${
-            benchmarkData.autoSnapshot
-              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25'
-              : (benchmarkData.daytonaOverrideCpus != null || benchmarkData.daytonaOverrideMemoryMb != null || benchmarkData.daytonaOverrideStorageMb != null)
-                ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/25'
-                : 'bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/25'
-          }`}>
-            {benchmarkData.autoSnapshot
-              ? 'D: Snapshot'
-              : (benchmarkData.daytonaOverrideCpus != null || benchmarkData.daytonaOverrideMemoryMb != null || benchmarkData.daytonaOverrideStorageMb != null)
-                ? `D: ${benchmarkData.daytonaOverrideCpus ?? 'x'}/${benchmarkData.daytonaOverrideMemoryMb != null ? (benchmarkData.daytonaOverrideMemoryMb / 1024).toFixed(0) : 'x'}/${benchmarkData.daytonaOverrideStorageMb != null ? (benchmarkData.daytonaOverrideStorageMb / 1024).toFixed(0) : 'x'}`
-                : 'D: Default'}
-          </span>
+          {(() => {
+            // Snapshot resource config changed on 2026-04-13. Evals run before that date
+            // are flagged "snapshot_old" with a yellow stale-warning color.
+            // jobCreatedAt is a PT-localised "YYYY-MM-DD HH:MM:SS" string, lexicographically comparable.
+            const SNAPSHOT_CUTOFF = '2026-04-13';
+            const hasOverride = benchmarkData.daytonaOverrideCpus != null
+              || benchmarkData.daytonaOverrideMemoryMb != null
+              || benchmarkData.daytonaOverrideStorageMb != null;
+            const isOldSnapshot = !!benchmarkData.autoSnapshot
+              && !!benchmarkData.jobCreatedAt
+              && benchmarkData.jobCreatedAt < SNAPSHOT_CUTOFF;
+            const badgeClass = isOldSnapshot
+              ? 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30'
+              : benchmarkData.autoSnapshot
+                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25'
+                : hasOverride
+                  ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/25'
+                  : 'bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/25';
+            const badgeText = isOldSnapshot
+              ? 'D: snapshot_old'
+              : benchmarkData.autoSnapshot
+                ? 'D: Snapshot'
+                : hasOverride
+                  ? `D: ${benchmarkData.daytonaOverrideCpus ?? 'x'}/${benchmarkData.daytonaOverrideMemoryMb != null ? (benchmarkData.daytonaOverrideMemoryMb / 1024).toFixed(0) : 'x'}/${benchmarkData.daytonaOverrideStorageMb != null ? (benchmarkData.daytonaOverrideStorageMb / 1024).toFixed(0) : 'x'}`
+                  : 'D: Default';
+            return (
+              <span
+                className={`font-mono text-[10px] rounded-full px-2 py-0.5 border whitespace-nowrap ${badgeClass}`}
+                title={isOldSnapshot ? `Eval ran before snapshot config change on ${SNAPSHOT_CUTOFF}` : undefined}
+              >
+                {badgeText}
+              </span>
+            );
+          })()}
           {isOverlong && (
             <span
               className="inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold bg-red-500/15 text-red-500 border-red-500/30"
