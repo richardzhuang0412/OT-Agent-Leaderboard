@@ -812,6 +812,19 @@ export default function Leaderboard() {
                   <span>Default Daytona sandbox config (no overrides, no snapshot)</span>
                 </div>
               </div>
+              <div className="flex flex-wrap items-center gap-4 text-xs ml-6">
+                <div className="flex items-start gap-2">
+                  <span className="inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30 whitespace-nowrap">Errors: N</span>
+                  <span>
+                    Shown when more than 10 trials failed with <span className="font-medium">non-benign</span> errors. Benign error types are excluded from the count:{' '}
+                    <span className="font-mono">AgentTimeoutError</span>,{' '}
+                    <span className="font-mono">ContextLengthExceededError</span>,{' '}
+                    <span className="font-mono">SummarizationTimeout</span>/<span className="font-mono">SummarizationTimeoutError</span>,{' '}
+                    <span className="font-mono">BadRequestError</span>,{' '}
+                    <span className="font-mono">NonZeroAgentExitCodeError</span>.
+                  </span>
+                </div>
+              </div>
             </div>
 
           </div>

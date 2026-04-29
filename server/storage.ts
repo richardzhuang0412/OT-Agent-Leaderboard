@@ -422,6 +422,7 @@ export class DbStorage implements IStorage {
       const BENIGN_ERRORS = new Set([
         'AgentTimeoutError', 'ContextLengthExceededError',
         'SummarizationTimeout', 'SummarizationTimeoutError', 'BadRequestError',
+        'NonZeroAgentExitCodeError',
       ]);
 
       let invalidErrorCount = 0;
