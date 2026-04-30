@@ -821,7 +821,8 @@ export default function Leaderboard() {
                     <span className="font-mono">ContextLengthExceededError</span>,{' '}
                     <span className="font-mono">SummarizationTimeout</span>/<span className="font-mono">SummarizationTimeoutError</span>,{' '}
                     <span className="font-mono">BadRequestError</span>,{' '}
-                    <span className="font-mono">NonZeroAgentExitCodeError</span>.
+                    <span className="font-mono">NonZeroAgentExitCodeError</span>,{' '}
+                    <span className="font-mono">VerifierRuntimeError</span>.
                   </span>
                 </div>
               </div>
