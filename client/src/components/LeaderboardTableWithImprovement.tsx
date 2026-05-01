@@ -314,14 +314,22 @@ export default function LeaderboardTableWithImprovement({
           canonicalRows.set(canonicalKey, canonicalRow);
         }
 
-        // Merge benchmarks: fill gaps, and prefer Finished over Pending/Started
+        // Merge benchmarks. When both canonical and duplicate have a result for the
+        // same benchmark, concatenate their allResults arrays so every eval is visible
+        // in the cell's cycle UI (sorted latest-first by jobCreatedAt). Single-eval
+        // modes (latest/oldest/highest) don't populate allResults, so we wrap their
+        // single entry into a 1-item array first — this also makes the cycle UI surface
+        // the otherwise-shadowed duplicate eval in those modes.
         for (const [benchmarkName, benchmarkData] of Object.entries(dupRow.benchmarks)) {
           const existing = canonicalRow.benchmarks[benchmarkName];
           if (!existing) {
             canonicalRow.benchmarks[benchmarkName] = { ...benchmarkData };
-          } else if (existing.accuracy === null && benchmarkData.accuracy !== null) {
-            // Canonical has Pending/Started, duplicate has Finished — prefer Finished
-            canonicalRow.benchmarks[benchmarkName] = { ...benchmarkData };
+          } else {
+            const existingResults = existing.allResults ?? [existing];
+            const dupResults = benchmarkData.allResults ?? [benchmarkData];
+            const combined = [...existingResults, ...dupResults]
+              .sort((a, b) => (b.jobCreatedAt ?? '').localeCompare(a.jobCreatedAt ?? ''));
+            canonicalRow.benchmarks[benchmarkName] = { ...combined[0], allResults: combined };
           }
         }
 
