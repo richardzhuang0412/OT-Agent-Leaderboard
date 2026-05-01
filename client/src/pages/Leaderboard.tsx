@@ -62,6 +62,7 @@ const TABLE_1_SECTIONS: Array<{ label: string; models: string[] }> = [
       'GAIR/OpenSWE-32B',
       'GAIR/daVinci-Dev-32B',
       'SWE-Lego/SWE-Lego-Qwen3-32B',
+      'agentica-org/DeepSWE-Preview',
     ],
   },
   {
@@ -71,6 +72,7 @@ const TABLE_1_SECTIONS: Array<{ label: string; models: string[] }> = [
       'Qwen/Qwen3-235B-A22B-Instruct-2507-tput',
       'moonshotai/Kimi-K2.5',
       'zai-org/GLM-4.7',
+      'zai-org/GLM-5',
     ],
   },
   {
