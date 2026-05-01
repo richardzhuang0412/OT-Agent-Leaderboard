@@ -379,9 +379,12 @@ export default function Leaderboard() {
       case 'ood':
         return pivotedData;
       case 'war':
-        return pivotedData.filter(row => WAR_MODELS.has(row.modelName));
+        // Match against the canonical model name so duplicate-model rows
+        // (e.g. openai/Foo as duplicate_of Foo) pass through and get merged
+        // into the canonical row by the table's duplicate-merge step.
+        return pivotedData.filter(row => WAR_MODELS.has(row.canonicalModelName ?? row.modelName));
       case 'table1':
-        return pivotedData.filter(row => TABLE_1_MODELS.has(row.modelName));
+        return pivotedData.filter(row => TABLE_1_MODELS.has(row.canonicalModelName ?? row.modelName));
       case 'guardrail':
         return pivotedData.filter(row =>
           Object.values(row.benchmarks).some(b => {
