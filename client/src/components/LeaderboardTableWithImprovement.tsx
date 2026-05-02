@@ -802,6 +802,58 @@ export default function LeaderboardTableWithImprovement({
     setShowExportMenu(false);
   };
 
+  const handleExportFullTable = () => {
+    // Header row: mirror the visible columns. Full model name is repeated on every
+    // row even when the rendered table collapses same-model agent groups under "↳".
+    const headers = [
+      'Model Name', 'Agent Name',
+      ...visibleBenchmarks,
+      'Base Model', 'Training Type',
+      'Model Created At', 'First Eval Ended At', 'Latest Eval Ended At',
+    ];
+    const lines: string[] = [headers.join('\t')];
+    for (const row of filteredAndSortedData) {
+      const cells: string[] = [
+        row.modelName ?? '',
+        row.agentName ?? '',
+      ];
+      for (const benchmark of visibleBenchmarks) {
+        const cellData = row.benchmarks[benchmark];
+        const allResults = cellData?.allResults;
+        const hasMultiple = allResults && allResults.length > 1;
+        const cellKey = `${row.modelName}|||${row.agentName}|||${benchmark}`;
+        const currentIdx = cellResultIndex[cellKey] ?? 0;
+        const displayData = hasMultiple ? allResults[currentIdx] : cellData;
+        const acc = displayData?.accuracy;
+        const se = displayData?.standardError;
+        if (acc == null) {
+          cells.push('—');
+        } else if (se != null) {
+          cells.push(`${acc.toFixed(1)}% ± ${se.toFixed(2)}`);
+        } else {
+          cells.push(`${acc.toFixed(1)}%`);
+        }
+      }
+      cells.push(
+        row.baseModelName ?? '',
+        row.trainingType ?? '',
+        row.modelCreatedAt ?? '',
+        row.firstEvalEndedAt ?? '',
+        row.latestEvalEndedAt ?? '',
+      );
+      // Replace any embedded tabs/newlines so the TSV stays well-formed.
+      lines.push(cells.map(c => String(c).replace(/[\t\r\n]/g, ' ')).join('\t'));
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/tab-separated-values' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'leaderboard_table_export.tsv';
+    a.click();
+    URL.revokeObjectURL(url);
+    setShowExportMenu(false);
+  };
+
   const getAccuracyColor = (accuracy: number) => {
     if (accuracy >= 90) return 'text-chart-2';
     if (accuracy >= 70) return 'text-chart-3';
@@ -1080,6 +1132,14 @@ export default function LeaderboardTableWithImprovement({
           </button>
           {showExportMenu && (
             <div className="absolute right-0 top-full mt-1 z-50 w-56 rounded-md border border-border bg-popover shadow-md py-1 max-h-72 overflow-y-auto">
+              <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Whole Table</div>
+              <button
+                onClick={handleExportFullTable}
+                className="w-full text-left px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
+              >
+                Full Table (TSV)
+              </button>
+              <div className="border-t border-border my-1" />
               <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Fields</div>
               {(['modelName', 'agentName', 'baseModelName', 'trainingType'] as const).map(field => (
                 <button
