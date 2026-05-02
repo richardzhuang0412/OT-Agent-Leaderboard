@@ -803,6 +803,13 @@ export default function LeaderboardTableWithImprovement({
   };
 
   const handleExportFullTable = () => {
+    // RFC 4180 quoting: wrap any field containing comma, double-quote, CR, or LF in
+    // double quotes and double-up any internal quotes.
+    const csvEscape = (raw: string): string => {
+      const s = String(raw);
+      if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+      return s;
+    };
     // Header row: mirror the visible columns. Full model name is repeated on every
     // row even when the rendered table collapses same-model agent groups under "↳".
     const headers = [
@@ -811,7 +818,7 @@ export default function LeaderboardTableWithImprovement({
       'Base Model', 'Training Type',
       'Model Created At', 'First Eval Ended At', 'Latest Eval Ended At',
     ];
-    const lines: string[] = [headers.join('\t')];
+    const lines: string[] = [headers.map(csvEscape).join(',')];
     for (const row of filteredAndSortedData) {
       const cells: string[] = [
         row.modelName ?? '',
@@ -841,14 +848,15 @@ export default function LeaderboardTableWithImprovement({
         row.firstEvalEndedAt ?? '',
         row.latestEvalEndedAt ?? '',
       );
-      // Replace any embedded tabs/newlines so the TSV stays well-formed.
-      lines.push(cells.map(c => String(c).replace(/[\t\r\n]/g, ' ')).join('\t'));
+      lines.push(cells.map(csvEscape).join(','));
     }
-    const blob = new Blob([lines.join('\n')], { type: 'text/tab-separated-values' });
+    // UTF-8 BOM so Excel detects the encoding and renders the ± character correctly.
+    const csv = '﻿' + lines.join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'leaderboard_table_export.tsv';
+    a.download = 'leaderboard_table_export.csv';
     a.click();
     URL.revokeObjectURL(url);
     setShowExportMenu(false);
@@ -1137,7 +1145,7 @@ export default function LeaderboardTableWithImprovement({
                 onClick={handleExportFullTable}
                 className="w-full text-left px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
               >
-                Full Table (TSV)
+                Full Table (CSV)
               </button>
               <div className="border-t border-border my-1" />
               <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Fields</div>
