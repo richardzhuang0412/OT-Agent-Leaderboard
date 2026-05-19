@@ -137,9 +137,69 @@ const WAR_SECTION_BY_MODEL: Record<string, string> = WAR_SECTIONS.reduce((acc, s
   return acc;
 }, {} as Record<string, string>);
 
+const SCALING_SECTIONS: Array<{ label: string; models: string[] }> = [
+  {
+    label: 'laion nemotron (~8B)',
+    models: [
+      'laion/nemotron-316-opt1k__Qwen3-8B',
+      'laion/nemotron-1000-opt1k__Qwen3-8B',
+      'laion/nemotron-terminal-corpus-unified-3160__Qwen3-8B',
+      'laion/nemotron-10000__Qwen3-8B',
+      'laion/nemotron-31600-opt100k__Qwen3-8B',
+      'laion/nemotron-100000-opt100k__Qwen3-8B',
+    ],
+  },
+  {
+    label: 'laion nemotron (~32B)',
+    models: [
+      'laion/nemotron-terminal-corpus-unified-316__Qwen3-32B',
+      'laion/nemotron-terminal-corpus-unified-1000__Qwen3-32B',
+      'laion/nemotron-terminal-corpus-unified-3160__Qwen3-32B',
+      'laion/nemotron-terminal-corpus-unified-10000__Qwen3-32B',
+      'laion/nemotron-terminal-corpus-unified-31600__Qwen3-32B',
+      'laion/nemotron-terminal-corpus-unified-100000__Qwen3-32B',
+    ],
+  },
+  {
+    label: 'SERA (~32B)',
+    models: [
+      'ethanlshen/Qwen3-32B-316_sera_46_47000',
+      'ethanlshen/Qwen3-32B-1000_sera_46_47000',
+      'ethanlshen/Qwen3-32B-3160_sera_46_47000-converted',
+      'ethanlshen/Qwen3-32B-10000_sera_46_47000',
+      'allenai/SERA-32B',
+    ],
+  },
+  {
+    label: 'DCAgent g1 (~32B)',
+    models: [
+      'DCAgent3/g1_diverse_tezos_top4_316_32b',
+      'DCAgent3/g1_diverse_tezos_top4_1000_32b',
+      'DCAgent3/g1_diverse_tezos_top4_3160_32b',
+      'DCAgent3/g1_diverse_tezos_top4_10000_32b',
+      'DCAgent2/g1_diverse_tezos_top4_31600_32b_step900',
+      'DCAgent/g1_diverse_tezos_100k_32b_step3600',
+    ],
+  },
+  {
+    label: 'Base',
+    models: [
+      'Qwen/Qwen3-8B',
+      'Qwen/Qwen3-32B',
+    ],
+  },
+];
+
+const SCALING_ORDER: string[] = SCALING_SECTIONS.flatMap(s => s.models);
+const SCALING_MODELS = new Set<string>(SCALING_ORDER);
+const SCALING_SECTION_BY_MODEL: Record<string, string> = SCALING_SECTIONS.reduce((acc, s) => {
+  s.models.forEach(m => { acc[m] = s.label; });
+  return acc;
+}, {} as Record<string, string>);
+
 export default function Leaderboard() {
   const [selectionMode, setSelectionMode] = useState<EvalSelectionMode>('all');
-  const [activeTab, setActiveTab] = useState<'filtered' | 'all' | 'blacklisted' | 'base' | 'active' | 'a1' | 'b1' | 'c1' | 'd1' | 'e1' | 'f1' | 'g1' | 'ood' | 'war' | 'table1' | 'baselineData' | 'missingEval' | 'guardrail'>('all');
+  const [activeTab, setActiveTab] = useState<'filtered' | 'all' | 'blacklisted' | 'base' | 'active' | 'a1' | 'b1' | 'c1' | 'd1' | 'e1' | 'f1' | 'g1' | 'ood' | 'war' | 'table1' | 'scaling' | 'baselineData' | 'missingEval' | 'guardrail'>('all');
   const [topN, setTopN] = useState<number>(50);
   const [recentlyAddedN, setRecentlyAddedN] = useState<number>(50);
   const [recentlyEvaledN, setRecentlyEvaledN] = useState<number>(50);
@@ -388,6 +448,8 @@ export default function Leaderboard() {
         return pivotedData.filter(row => WAR_MODELS.has(row.canonicalModelName ?? row.modelName));
       case 'table1':
         return pivotedData.filter(row => TABLE_1_MODELS.has(row.canonicalModelName ?? row.modelName));
+      case 'scaling':
+        return pivotedData.filter(row => SCALING_MODELS.has(row.canonicalModelName ?? row.modelName));
       case 'guardrail':
         return pivotedData.filter(row =>
           Object.values(row.benchmarks).some(b => {
@@ -535,6 +597,7 @@ export default function Leaderboard() {
               <TabsTrigger value="ood" className="text-xs sm:text-sm bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300 data-[state=active]:bg-fuchsia-500/30">OOD</TabsTrigger>
               <TabsTrigger value="war" className="text-xs sm:text-sm bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 data-[state=active]:bg-yellow-500/30 font-bold">WAR</TabsTrigger>
               <TabsTrigger value="table1" className="text-xs sm:text-sm bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 data-[state=active]:bg-indigo-500/30">Table 1</TabsTrigger>
+              <TabsTrigger value="scaling" className="text-xs sm:text-sm bg-sky-500/15 text-sky-700 dark:text-sky-300 data-[state=active]:bg-sky-500/30">Scaling</TabsTrigger>
               <TabsTrigger value="baselineData" className="text-xs sm:text-sm bg-purple-500/15 text-purple-700 dark:text-purple-300 data-[state=active]:bg-purple-500/30">Baseline Data</TabsTrigger>
               <TabsTrigger value="missingEval" className="text-xs sm:text-sm bg-red-500/15 text-red-700 dark:text-red-300 data-[state=active]:bg-red-500/30">Missing Eval</TabsTrigger>
               <TabsTrigger value="guardrail" className="text-xs sm:text-sm bg-orange-500/15 text-orange-700 dark:text-orange-300 data-[state=active]:bg-orange-500/30">Guardrail</TabsTrigger>
@@ -861,7 +924,7 @@ export default function Leaderboard() {
           </TabsContent>
 
           {/* Shared content for all non-filtered tabs */}
-          {(['all', 'base', 'a1', 'b1', 'c1', 'd1', 'e1', 'f1', 'g1', 'ood', 'war', 'table1', 'baselineData', 'missingEval', 'guardrail', 'active', 'blacklisted'] as const).map(tabValue => (
+          {(['all', 'base', 'a1', 'b1', 'c1', 'd1', 'e1', 'f1', 'g1', 'ood', 'war', 'table1', 'scaling', 'baselineData', 'missingEval', 'guardrail', 'active', 'blacklisted'] as const).map(tabValue => (
             <TabsContent key={tabValue} value={tabValue} className="space-y-6">
               <SearchBarWithBaseModel
                 modelSearch={modelSearch}
@@ -1141,11 +1204,13 @@ export default function Leaderboard() {
                 customOrder={
                   tabValue === 'table1' ? TABLE_1_ORDER :
                   tabValue === 'war' ? WAR_ORDER :
+                  tabValue === 'scaling' ? SCALING_ORDER :
                   undefined
                 }
                 sectionByModel={
                   tabValue === 'table1' ? TABLE_1_SECTION_BY_MODEL :
                   tabValue === 'war' ? WAR_SECTION_BY_MODEL :
+                  tabValue === 'scaling' ? SCALING_SECTION_BY_MODEL :
                   undefined
                 }
               />
