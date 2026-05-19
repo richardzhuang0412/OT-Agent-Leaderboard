@@ -575,7 +575,7 @@ export default function Leaderboard() {
           if (newTab === 'ood') {
             const validOOD = OOD_BENCHMARKS.filter(b => availableBenchmarks.includes(b));
             if (validOOD.length > 0) setSelectedBenchmarks(validOOD);
-          } else if (newTab === 'war' || newTab === 'table1') {
+          } else if (newTab === 'war' || newTab === 'table1' || newTab === 'scaling') {
             const validBenchmarks = [...CORE_BENCHMARKS, ...OOD_BENCHMARKS].filter(b => availableBenchmarks.includes(b));
             if (validBenchmarks.length > 0) setSelectedBenchmarks(validBenchmarks);
           } else {
