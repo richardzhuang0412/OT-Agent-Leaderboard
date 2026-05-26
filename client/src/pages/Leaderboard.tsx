@@ -167,6 +167,7 @@ const SCALING_SECTIONS: Array<{ label: string; models: string[] }> = [
       'ethanlshen/Qwen3-32B-1000_sera_46_47000',
       'ethanlshen/Qwen3-32B-3160_sera_46_47000-converted',
       'ethanlshen/Qwen3-32B-10000_sera_46_47000',
+      'ethanlshen/Qwen3-32B-31600_sera_46_47000_converted',
       'allenai/SERA-32B',
     ],
   },
