@@ -190,6 +190,7 @@ const SCALING_SECTIONS: Array<{ label: string; models: string[] }> = [
       'DCAgent3/g1_diverse_tezos_top4_1000_8b',
       'DCAgent3/g1_diverse_tezos_top4_3160_8b',
       'DCAgent3/g1_diverse_tezos_top4_10000_8b',
+      'DCAgent/g1_diverse_tezos_100k_8b',
     ],
   },
   {
