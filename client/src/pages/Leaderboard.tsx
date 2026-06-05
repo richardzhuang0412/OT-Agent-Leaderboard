@@ -168,6 +168,7 @@ const SCALING_SECTIONS: Array<{ label: string; models: string[] }> = [
       'ethanlshen/Qwen3-32B-3160_sera_46_47000-converted',
       'ethanlshen/Qwen3-32B-10000_sera_46_47000',
       'ethanlshen/Qwen3-32B-31600_sera_46_47000_converted',
+      'ethanlshen/Qwen3-32B-47000-46',
       'allenai/SERA-32B',
     ],
   },
@@ -183,6 +184,15 @@ const SCALING_SECTIONS: Array<{ label: string; models: string[] }> = [
     ],
   },
   {
+    label: '8B Scaling',
+    models: [
+      'DCAgent3/g1_diverse_tezos_top4_316_8b',
+      'DCAgent3/g1_diverse_tezos_top4_1000_8b',
+      'DCAgent3/g1_diverse_tezos_top4_3160_8b',
+      'DCAgent3/g1_diverse_tezos_top4_10000_8b',
+    ],
+  },
+  {
     label: 'Base',
     models: [
       'Qwen/Qwen3-8B',
@@ -190,6 +200,9 @@ const SCALING_SECTIONS: Array<{ label: string; models: string[] }> = [
     ],
   },
 ];
+
+// "8B RL" tab: the base model below plus every model trained on top of it.
+const RL_8B_BASE_MODEL = 'laion/GLM-4_7-swesmith-sandboxes-with_tests-oracle_verified_120s-maxeps-131k-fixthink';
 
 const SCALING_ORDER: string[] = SCALING_SECTIONS.flatMap(s => s.models);
 const SCALING_MODELS = new Set<string>(SCALING_ORDER);
@@ -200,7 +213,7 @@ const SCALING_SECTION_BY_MODEL: Record<string, string> = SCALING_SECTIONS.reduce
 
 export default function Leaderboard() {
   const [selectionMode, setSelectionMode] = useState<EvalSelectionMode>('all');
-  const [activeTab, setActiveTab] = useState<'filtered' | 'all' | 'blacklisted' | 'base' | 'active' | 'a1' | 'b1' | 'c1' | 'd1' | 'e1' | 'f1' | 'g1' | 'ood' | 'war' | 'table1' | 'scaling' | 'baselineData' | 'missingEval' | 'guardrail'>('all');
+  const [activeTab, setActiveTab] = useState<'filtered' | 'all' | 'blacklisted' | 'base' | 'active' | 'a1' | 'b1' | 'c1' | 'd1' | 'e1' | 'f1' | 'g1' | 'ood' | 'war' | 'table1' | 'scaling' | 'rl8b' | 'baselineData' | 'missingEval' | 'guardrail'>('all');
   const [topN, setTopN] = useState<number>(50);
   const [recentlyAddedN, setRecentlyAddedN] = useState<number>(50);
   const [recentlyEvaledN, setRecentlyEvaledN] = useState<number>(50);
@@ -451,6 +464,13 @@ export default function Leaderboard() {
         return pivotedData.filter(row => TABLE_1_MODELS.has(row.canonicalModelName ?? row.modelName));
       case 'scaling':
         return pivotedData.filter(row => SCALING_MODELS.has(row.canonicalModelName ?? row.modelName));
+      case 'rl8b':
+        // Models trained on the 8B RL base, plus the base model itself.
+        return pivotedData.filter(row =>
+          row.baseModelName === RL_8B_BASE_MODEL ||
+          row.canonicalBaseModelName === RL_8B_BASE_MODEL ||
+          (row.canonicalModelName ?? row.modelName) === RL_8B_BASE_MODEL
+        );
       case 'guardrail':
         return pivotedData.filter(row =>
           Object.values(row.benchmarks).some(b => {
@@ -599,6 +619,7 @@ export default function Leaderboard() {
               <TabsTrigger value="war" className="text-xs sm:text-sm bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 data-[state=active]:bg-yellow-500/30 font-bold">WAR</TabsTrigger>
               <TabsTrigger value="table1" className="text-xs sm:text-sm bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 data-[state=active]:bg-indigo-500/30">Table 1</TabsTrigger>
               <TabsTrigger value="scaling" className="text-xs sm:text-sm bg-sky-500/15 text-sky-700 dark:text-sky-300 data-[state=active]:bg-sky-500/30">Scaling</TabsTrigger>
+              <TabsTrigger value="rl8b" className="text-xs sm:text-sm bg-lime-500/15 text-lime-700 dark:text-lime-300 data-[state=active]:bg-lime-500/30">8B RL</TabsTrigger>
               <TabsTrigger value="baselineData" className="text-xs sm:text-sm bg-purple-500/15 text-purple-700 dark:text-purple-300 data-[state=active]:bg-purple-500/30">Baseline Data</TabsTrigger>
               <TabsTrigger value="missingEval" className="text-xs sm:text-sm bg-red-500/15 text-red-700 dark:text-red-300 data-[state=active]:bg-red-500/30">Missing Eval</TabsTrigger>
               <TabsTrigger value="guardrail" className="text-xs sm:text-sm bg-orange-500/15 text-orange-700 dark:text-orange-300 data-[state=active]:bg-orange-500/30">Guardrail</TabsTrigger>
@@ -925,7 +946,7 @@ export default function Leaderboard() {
           </TabsContent>
 
           {/* Shared content for all non-filtered tabs */}
-          {(['all', 'base', 'a1', 'b1', 'c1', 'd1', 'e1', 'f1', 'g1', 'ood', 'war', 'table1', 'scaling', 'baselineData', 'missingEval', 'guardrail', 'active', 'blacklisted'] as const).map(tabValue => (
+          {(['all', 'base', 'a1', 'b1', 'c1', 'd1', 'e1', 'f1', 'g1', 'ood', 'war', 'table1', 'scaling', 'rl8b', 'baselineData', 'missingEval', 'guardrail', 'active', 'blacklisted'] as const).map(tabValue => (
             <TabsContent key={tabValue} value={tabValue} className="space-y-6">
               <SearchBarWithBaseModel
                 modelSearch={modelSearch}
